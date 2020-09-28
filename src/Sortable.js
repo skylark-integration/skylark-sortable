@@ -2432,5 +2432,5 @@ define([
 	// Export
 	Sortable.version = '1.9.0';
 
-	return skylark.attach("itg.Sortable",Sortable);
+	return skylark.attach("intg.Sortable",Sortable);
 });
