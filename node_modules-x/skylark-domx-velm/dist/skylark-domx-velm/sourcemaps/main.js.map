@@ -1,0 +1,1 @@
+{"version":3,"sources":["main.js"],"names":["define","velm"],"mappings":";;;;;;;AAAAA,QACC,UACC,SAASC,GACV,OAAOA","file":"../main.js","sourcesContent":["define([\r\n\t\"./velm\"\r\n],function(velm){\r\n\treturn velm;\r\n});"]}

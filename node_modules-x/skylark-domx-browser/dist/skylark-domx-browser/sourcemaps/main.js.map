@@ -1,0 +1,1 @@
+{"version":3,"sources":["main.js"],"names":["define","browser"],"mappings":";;;;;;;AAAAA,QACC,aACC,SAASC,GACV,OAAOA","file":"../main.js","sourcesContent":["define([\r\n\t\"./browser\"\r\n],function(browser){\r\n\treturn browser;\r\n});"]}

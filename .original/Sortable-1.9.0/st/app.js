@@ -13,6 +13,7 @@ var example1 = document.getElementById('example1'),
 // Example 1 - Simple list
 new Sortable(example1, {
 	animation: 150,
+	forceFallback : true,
 	ghostClass: 'blue-background-class'
 });
 

@@ -1,6 +1,34 @@
 define([
-	"skylark-langx/skylark"
-],function(skylark){
+	"skylark-langx/skylark",
+	"skylark-langx/langx",
+	"skylark-langx-hoster/isMobile",
+	"skylark-domx-query",
+	"skylark-domx-browser",
+	"skylark-domx-noder",
+	"skylark-domx-finder",
+	"skylark-domx-geom",
+	"skylark-domx-styler",
+	"skylark-domx-eventer",
+	"skylark-domx-transforms",
+	"skylark-devices-points/touch"
+],function(
+	skylark,
+	langx,
+	isMobile,
+	$,
+	browser,
+	noder,
+	finder,
+	geom,
+	styler,
+	eventer,
+	transforms,
+	touch
+){
+	function log(category,message) {
+		$("#console").append("<div>"+category+":"+message+"</div>");	
+	}	
+
 
 	var dragEl,
 		parentEl,
@@ -63,7 +91,6 @@ define([
 		parseInt = win.parseInt,
 		setTimeout = win.setTimeout,
 
-		$ = win.jQuery || win.Zepto,
 		Polymer = win.Polymer,
 
 		captureMode = {
@@ -77,13 +104,15 @@ define([
 		Safari = !!(navigator.userAgent.match(/safari/i) && !navigator.userAgent.match(/chrome/i) && !navigator.userAgent.match(/android/i)),
 		IOS = !!(navigator.userAgent.match(/iP(ad|od|hone)/i)),
 
-		PositionGhostAbsolutely = IOS,
+		PositionGhostAbsolutely = isMobile.apple.device, //IOS
 
 		CSSFloatProperty = Edge || IE11OrLess ? 'cssFloat' : 'float',
 
 		// This will not pass for IE9, because IE9 DnD only works on anchors
-		supportDraggable = ('draggable' in document.createElement('div')),
+		supportDraggable = ('draggable' in document.createElement('div')) && !isMobile.apple.device
+,
 
+		/*
 		supportCssPointerEvents = (function() {
 			// false when <= IE11
 			if (IE11OrLess) {
@@ -93,6 +122,8 @@ define([
 			el.style.cssText = 'pointer-events:auto';
 			return el.style.pointerEvents === 'auto';
 		})(),
+		*/
+		supportCssPointerEvents = browser.support.cssPointerEvents;
 
 		_silent = false,
 		_alignedSilent = false,
@@ -105,17 +136,25 @@ define([
 
 		_detectDirection = function(el, options) {
 			var elCSS = _css(el),
+				/*
 				elWidth = parseInt(elCSS.width)
 					- parseInt(elCSS.paddingLeft)
 					- parseInt(elCSS.paddingRight)
 					- parseInt(elCSS.borderLeftWidth)
 					- parseInt(elCSS.borderRightWidth),
+				*/
+				elWidth = geom.contentRect(el).width,
+
 				child1 = _getChild(el, 0, options),
 				child2 = _getChild(el, 1, options),
 				firstChildCSS = child1 && _css(child1),
 				secondChildCSS = child2 && _css(child2),
+				/*
 				firstChildWidth = firstChildCSS && parseInt(firstChildCSS.marginLeft) + parseInt(firstChildCSS.marginRight) + _getRect(child1).width,
 				secondChildWidth = secondChildCSS && parseInt(secondChildCSS.marginLeft) + parseInt(secondChildCSS.marginRight) + _getRect(child2).width;
+				*/
+				firstChildWidth = child1 && geom.marginSize(child1).width,
+				secondChildWidth = child2 && geom.marginSize(child2).width;
 
 			if (elCSS.display === 'flex') {
 				return elCSS.flexDirection === 'column' || elCSS.flexDirection === 'column-reverse'
@@ -423,6 +462,7 @@ define([
 		};
 
 
+
 	// #1184 fix - Prevent click event on fallback if dragged but item not changed position
 	document.addEventListener('click', function(evt) {
 		if (ignoreNextClick) {
@@ -539,12 +579,18 @@ define([
 		}
 
 		// Bind events
+		/*
 		if (options.supportPointer) {
 			_on(el, 'pointerdown', this._onTapStart);
 		} else {
 			_on(el, 'mousedown', this._onTapStart);
 			_on(el, 'touchstart', this._onTapStart);
 		}
+		*/
+
+		touch.mousy(el);
+
+		_on(el, 'mousedown', this._onTapStart);
 
 		if (this.nativeDraggable) {
 			_on(el, 'dragover', this);
@@ -599,7 +645,7 @@ define([
 		},
 
 		_onTapStart: function (/** Event|TouchEvent */evt) {
-			if (!evt.cancelable) return;
+			//if (!evt.cancelable) return;
 			var _this = this,
 				el = this.el,
 				options = this.options,
@@ -635,6 +681,8 @@ define([
 				// Ignoring duplicate `down`
 				return;
 			}
+
+			log("_onTapStart",target.tagName+","+target.className);
 
 			// Get the index of the dragged element within its parent
 			startIndex = _index(target);
@@ -686,7 +734,7 @@ define([
 			// MACOS Safari does not have autoscroll,
 			// Firefox and Chrome are good
 			if (fallback || Edge || IE11OrLess || Safari) {
-				_autoScroll(evt, _this.options, elem, fallback);
+				_throttleTimeout = _autoScroll(evt, _this.options, elem, fallback);
 
 				// Listener for pointer element change
 				var ogElemScroller = _getParentAutoScrollElement(elem, true);
@@ -708,7 +756,7 @@ define([
 						if (newElem !== ogElemScroller) {
 							ogElemScroller = newElem;
 							_clearAutoScrolls();
-							_autoScroll(evt, _this.options, ogElemScroller, fallback);
+							_throttleTimeout = _autoScroll(evt, _this.options, ogElemScroller, fallback);
 						}
 					}, 10);
 					lastPointerElemX = x;
@@ -721,7 +769,7 @@ define([
 					_clearAutoScrolls();
 					return;
 				}
-				_autoScroll(evt, _this.options, _getParentAutoScrollElement(elem, false), false);
+				_throttleTimeout = _autoScroll(evt, _this.options, _getParentAutoScrollElement(elem, false), false);
 			}
 		},
 
@@ -731,7 +779,7 @@ define([
 				options = _this.options,
 				ownerDocument = el.ownerDocument,
 				dragStartFn;
-
+			log("_prepareDragStart","start");
 			if (target && !dragEl && (target.parentNode === el)) {
 				rootEl = el;
 				dragEl = target;
@@ -800,11 +848,11 @@ define([
 					// before the delay has been reached:
 					// disable the delayed drag
 					_on(ownerDocument, 'mouseup', _this._disableDelayedDrag);
-					_on(ownerDocument, 'touchend', _this._disableDelayedDrag);
-					_on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
+					//_on(ownerDocument, 'touchend', _this._disableDelayedDrag);
+					//_on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
 					_on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
-					_on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
-					options.supportPointer && _on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
+					//_on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
+					//options.supportPointer && _on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
 
 					_this._dragStartTimer = setTimeout(dragStartFn, options.delay);
 				} else {
@@ -832,15 +880,15 @@ define([
 		_disableDelayedDragEvents: function () {
 			var ownerDocument = this.el.ownerDocument;
 			_off(ownerDocument, 'mouseup', this._disableDelayedDrag);
-			_off(ownerDocument, 'touchend', this._disableDelayedDrag);
-			_off(ownerDocument, 'touchcancel', this._disableDelayedDrag);
+			//_off(ownerDocument, 'touchend', this._disableDelayedDrag);
+			//_off(ownerDocument, 'touchcancel', this._disableDelayedDrag);
 			_off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
-			_off(ownerDocument, 'touchmove', this._delayedDragTouchMoveHandler);
-			_off(ownerDocument, 'pointermove', this._delayedDragTouchMoveHandler);
+			//_off(ownerDocument, 'touchmove', this._delayedDragTouchMoveHandler);
+			//_off(ownerDocument, 'pointermove', this._delayedDragTouchMoveHandler);
 		},
 
 		_triggerDragStart: function (/** Event */evt, /** Touch */touch) {
-			touch = touch || (evt.pointerType == 'touch' ? evt : null);
+			/*touch = touch || (evt.pointerType == 'touch' ? evt : null);
 
 			if (!this.nativeDraggable || touch) {
 				if (this.options.supportPointer) {
@@ -850,6 +898,11 @@ define([
 				} else {
 					_on(document, 'mousemove', this._onTouchMove);
 				}
+			*/
+			log("_triggerDragStart","start");
+			log("_triggerDragStart","nativeDraggable is " +  this.nativeDraggable);
+			if (!this.nativeDraggable) {
+				_on(document, 'mousemove', this._onTouchMove);
 			} else {
 				_on(dragEl, 'dragend', this);
 				_on(rootEl, 'dragstart', this._onDragStart);
@@ -944,6 +997,7 @@ define([
 
 
 		_onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
+			log("_onTouchMove","start");
 			if (tapEvt) {
 				var	options = this.options,
 					fallbackTolerance = options.fallbackTolerance,
@@ -981,7 +1035,8 @@ define([
 				_css(ghostEl, 'msTransform', translate3d);
 				_css(ghostEl, 'transform', translate3d);
 
-				evt.cancelable && evt.preventDefault();
+				//evt.cancelable && evt.preventDefault();
+				evt.preventDefault()
 			}
 		},
 
@@ -1397,20 +1452,20 @@ define([
 		},
 
 		_offMoveEvents: function() {
-			_off(document, 'touchmove', this._onTouchMove);
-			_off(document, 'pointermove', this._onTouchMove);
+			//_off(document, 'touchmove', this._onTouchMove);
+			//_off(document, 'pointermove', this._onTouchMove);
 			_off(document, 'dragover', nearestEmptyInsertDetectEvent);
 			_off(document, 'mousemove', nearestEmptyInsertDetectEvent);
-			_off(document, 'touchmove', nearestEmptyInsertDetectEvent);
+			//_off(document, 'touchmove', nearestEmptyInsertDetectEvent);
 		},
 
 		_offUpEvents: function () {
 			var ownerDocument = this.el.ownerDocument;
 
 			_off(ownerDocument, 'mouseup', this._onDrop);
-			_off(ownerDocument, 'touchend', this._onDrop);
-			_off(ownerDocument, 'pointerup', this._onDrop);
-			_off(ownerDocument, 'touchcancel', this._onDrop);
+			//_off(ownerDocument, 'touchend', this._onDrop);
+			//_off(ownerDocument, 'pointerup', this._onDrop);
+			//_off(ownerDocument, 'touchcancel', this._onDrop);
 			_off(document, 'selectstart', this);
 		},
 
@@ -1687,8 +1742,8 @@ define([
 			el[expando] = null;
 
 			_off(el, 'mousedown', this._onTapStart);
-			_off(el, 'touchstart', this._onTapStart);
-			_off(el, 'pointerdown', this._onTapStart);
+			//_off(el, 'touchstart', this._onTapStart);
+			//_off(el, 'pointerdown', this._onTapStart);
 
 			if (this.nativeDraggable) {
 				_off(el, 'dragover', this);
@@ -1741,7 +1796,9 @@ define([
 		}
 	};
 
+
 	function _closest(/**HTMLElement*/el, /**String*/selector, /**HTMLElement*/ctx, includeCTX) {
+		/*
 		if (el) {
 			ctx = ctx || document;
 
@@ -1759,18 +1816,24 @@ define([
 				}
 
 				if (el === ctx) break;
-				/* jshint boss:true */
+				// jshint boss:true 
 			} while (el = _getParentOrHost(el));
 		}
 
 		return null;
+		*/
+
+		return finder.closest(el,selector,ctx,includeCTX);
 	}
 
 
 	function _getParentOrHost(el) {
+		/*
 		return (el.host && el !== document && el.host.nodeType)
 			? el.host
 			: el.parentNode;
+		*/
+		return finder.parent(el);
 	}
 
 
@@ -1783,16 +1846,22 @@ define([
 
 
 	function _on(el, event, fn) {
-		el.addEventListener(event, fn, IE11OrLess ? false : captureMode);
+		//el.addEventListener(event, fn, IE11OrLess ? false : captureMode);
+		if (fn.handleEvent) {
+			fn.$handleEvent = fn.handleEvent.bind(fn);
+		}
+		eventer.on(el,event,fn.$handleEvent || fn);
 	}
 
 
 	function _off(el, event, fn) {
-		el.removeEventListener(event, fn, IE11OrLess ? false : captureMode);
+		//el.removeEventListener(event, fn, IE11OrLess ? false : captureMode);
+		eventer.off(el,event,fn.$handleEvent || fn);
 	}
 
 
 	function _toggleClass(el, name, state) {
+		/*
 		if (el && name) {
 			if (el.classList) {
 				el.classList[state ? 'add' : 'remove'](name);
@@ -1802,10 +1871,13 @@ define([
 				el.className = (className + (state ? ' ' + name : '')).replace(R_SPACE, ' ');
 			}
 		}
+		*/
+		return styler.toggleClass(el,name,state);
 	}
 
 
 	function _css(el, prop, val) {
+		/*
 		var style = el && el.style;
 
 		if (style) {
@@ -1827,9 +1899,16 @@ define([
 				style[prop] = val + (typeof val === 'string' ? '' : 'px');
 			}
 		}
+		*/
+
+		if (el && el.style) {
+			return styler.css(el,prop,val);
+		}
+
 	}
 
 	function _matrix(el) {
+		/*
 		var appliedTransforms = '';
 		do {
 			var transform = _css(el, 'transform');
@@ -1837,7 +1916,7 @@ define([
 			if (transform && transform !== 'none') {
 				appliedTransforms = transform + ' ' + appliedTransforms;
 			}
-			/* jshint boss:true */
+			// jshint boss:true 
 		} while (el = el.parentNode);
 
 		if (window.DOMMatrix) {
@@ -1847,6 +1926,8 @@ define([
 		} else if (window.CSSMatrix) {
 			return new CSSMatrix(appliedTransforms);
 		}
+		*/
+		return transforms.matrix(el);
 	}
 
 
@@ -1879,6 +1960,8 @@ define([
 		var evt,
 			options = sortable.options,
 			onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1);
+
+		/*
 		// Support for new CustomEvent feature
 		if (window.CustomEvent && !IE11OrLess && !Edge) {
 			evt = new CustomEvent(name, {
@@ -1903,7 +1986,20 @@ define([
 
 		evt.originalEvent = originalEvt;
 		evt.pullMode = putSortable ? putSortable.lastPutMode : undefined;
+		*/
 
+		evt = eventer.create(name,{
+			to : toEl || rootEl,
+			from : fromEl || rootEl,
+			item : targetEl || rootEl,
+			clone : cloneEl,
+			oldIndex : startIndex,
+			newIndex : newIndex,
+			oldDraggableIndex : startDraggableIndex,
+			newDraggableIndex : newDraggableIndex,
+			originalEvent : originalEvt,
+			pullMode : putSortable ? putSortable.lastPutMode : undefined
+		});
 		if (rootEl) {
 			rootEl.dispatchEvent(evt);
 		}
@@ -1919,6 +2015,8 @@ define([
 			sortable = fromEl[expando],
 			onMoveFn = sortable.options.onMove,
 			retVal;
+
+		/*
 		// Support for new CustomEvent feature
 		if (window.CustomEvent && !IE11OrLess && !Edge) {
 			evt = new CustomEvent('move', {
@@ -1939,6 +2037,18 @@ define([
 		evt.willInsertAfter = willInsertAfter;
 
 		evt.originalEvent = originalEvt;
+		*/
+
+		evt = eventer.create("move",{
+			to : toEl,
+			from : fromEl,
+			dragged : dragEl,
+			draggedRect: dragRect,
+			related : targetEl || toEl,
+			relatedRect : targetRect || _getRect(toEl),
+			willInsertAfter : willInsertAfter,
+			originalEvent : originalEvt
+		});
 
 		fromEl.dispatchEvent(evt);
 
@@ -2138,6 +2248,7 @@ define([
 	 * @return {number}
 	 */
 	function _index(el, selector) {
+		/*
 		var index = 0;
 
 		if (!el || !el.parentNode) {
@@ -2151,9 +2262,19 @@ define([
 		}
 
 		return index;
+		*/
+
+		return finder.index(el,function(el){
+			if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== cloneEl && (!selector || _matches(el, selector))) {
+				return true;
+			}
+
+			return false;			
+		})
 	}
 
 	function _matches(/**HTMLElement*/el, /**String*/selector) {
+		/*
 		if (!selector) return;
 
 		selector[0] === '>' && (selector = selector.substring(1));
@@ -2173,10 +2294,13 @@ define([
 		}
 
 		return false;
+		*/
+		return finder.matches(el,selector);
 	}
 
 	var _throttleTimeout;
 	function _throttle(callback, ms) {
+		/*
 		return function () {
 			if (!_throttleTimeout) {
 				var args = arguments,
@@ -2193,14 +2317,21 @@ define([
 				}, ms);
 			}
 		};
+		*/
+		return langx.debounce;
 	}
 
 	function _cancelThrottle() {
-		clearTimeout(_throttleTimeout);
-		_throttleTimeout = void 0;
+		//clearTimeout(_throttleTimeout);
+		//_throttleTimeout = void 0;
+		if (_throttleTimeout && _throttleTimeout.stop) {
+			_throttleTimeout.stop();
+			_throttleTimeout = void 0;
+		}
 	}
 
 	function _extend(dst, src) {
+		/*
 		if (dst && src) {
 			for (var key in src) {
 				if (src.hasOwnProperty(key)) {
@@ -2208,11 +2339,15 @@ define([
 				}
 			}
 		}
+		*/
+
+		langx.mixin(dst,src);
 
 		return dst;
 	}
 
 	function _clone(el) {
+		/*
 		if (Polymer && Polymer.dom) {
 			return Polymer.dom(el).cloneNode(true);
 		}
@@ -2222,6 +2357,8 @@ define([
 		else {
 			return el.cloneNode(true);
 		}
+		*/
+		return noder.clone(el,true);
 	}
 
 	function _saveInputCheckedState(root) {
@@ -2237,11 +2374,13 @@ define([
 	}
 
 	function _nextTick(fn) {
-		return setTimeout(fn, 0);
+		//return setTimeout(fn, 0);
+		return langx.defer(fn);
 	}
 
 	function _cancelNextTick(id) {
-		return clearTimeout(id);
+		//return clearTimeout(id);
+		return id && id.stop();
 	}
 
 

@@ -1,0 +1,1 @@
+{"version":3,"sources":["main.js"],"names":["define","klass"],"mappings":";;;;;;;AAAAA,QACC,WACC,SAASC,GACV,OAAOA","file":"../main.js","sourcesContent":["define([\r\n\t\"./klass\"\r\n],function(klass){\r\n\treturn klass;\r\n});"]}

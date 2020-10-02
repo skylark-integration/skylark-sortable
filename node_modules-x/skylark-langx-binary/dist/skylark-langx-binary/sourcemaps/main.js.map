@@ -1,0 +1,1 @@
+{"version":3,"sources":["main.js"],"names":["define","binary"],"mappings":";;;;;;;AAAAA,QACC,YACC,SAASC,GACV,OAAOA","file":"../main.js","sourcesContent":["define([\r\n\t\"./binary\"\r\n],function(binary){\r\n\treturn binary;\r\n});"]}

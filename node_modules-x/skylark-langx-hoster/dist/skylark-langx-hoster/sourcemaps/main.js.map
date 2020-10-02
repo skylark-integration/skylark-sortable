@@ -1,0 +1,1 @@
+{"version":3,"sources":["main.js"],"names":["define","hoster"],"mappings":";;;;;;;AAAAA,QACC,YACC,SAASC,GACV,OAAOA","file":"../main.js","sourcesContent":["define([\r\n\t\"./hoster\"\r\n],function(hoster){\r\n\treturn hoster;\r\n});"]}

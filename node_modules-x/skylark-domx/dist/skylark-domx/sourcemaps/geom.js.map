@@ -1,0 +1,1 @@
+{"version":3,"sources":["geom.js"],"names":["define","geom"],"mappings":";;;;;;;AAAAA,QACI,qBACD,SAAUC,GAET,OAAOA","file":"../geom.js","sourcesContent":["define([\r\n    \"skylark-domx-geom\"\r\n], function( geom) {\r\n\r\n    return geom;\r\n});"]}

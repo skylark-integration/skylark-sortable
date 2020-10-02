@@ -1,0 +1,1 @@
+{"version":3,"sources":["main.js"],"names":["define","aspect"],"mappings":";;;;;;;AAAAA,QACC,YACC,SAASC,GACV,OAAOA","file":"../main.js","sourcesContent":["define([\r\n\t\"./aspect\"\r\n],function(aspect){\r\n\treturn aspect;\r\n});"]}
