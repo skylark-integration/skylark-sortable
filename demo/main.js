@@ -146,6 +146,11 @@ requirejs.config({
             main: 'main'
          },
          {
+           name : "skylark-domx-layouts",
+           location : "../node_modules/skylark-domx-layouts/dist/uncompressed/skylark-domx-layouts",
+            main: 'main'
+         },
+         {
            name : "skylark-domx-noder",
            location : "../node_modules/skylark-domx-noder/dist/uncompressed/skylark-domx-noder",
             main: 'main'
@@ -174,6 +179,11 @@ requirejs.config({
          {
            name : "skylark-domx-styler",
            location : "../node_modules/skylark-domx-styler/dist/uncompressed/skylark-domx-styler",
+            main: 'main'
+         },
+         {
+           name : "skylark-domx-scrolls",
+           location : "../node_modules/skylark-domx-scrolls/dist/uncompressed/skylark-domx-scrolls",
             main: 'main'
          },
          {

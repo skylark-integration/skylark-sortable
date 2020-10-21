@@ -1,6 +1,7 @@
 define([
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
+	"skylark-langx-hoster/isBrowser",
 	"skylark-langx-hoster/isMobile",
 	"skylark-domx-query",
 	"skylark-domx-browser",
@@ -10,11 +11,14 @@ define([
 	"skylark-domx-styler",
 	"skylark-domx-eventer",
 	"skylark-domx-transforms",
+	"skylark-domx-scrolls/scrollingElement",
+	"skylark-domx-layouts/oriented",
 	"skylark-devices-points/touch",
-	"./helper"
+	"./autoscroll"
 ],function(
 	skylark,
 	langx,
+	isBrowser,
 	isMobile,
 	$,
 	browser,
@@ -24,8 +28,10 @@ define([
 	styler,
 	eventer,
 	transforms,
+	scrollingElement,
+	oriented,
 	touch,
-	helper
+	autoscroll
 ){
 	function log(category,message) {
 		$("#console").append("<div>"+category+":"+message+"</div>");	
@@ -51,9 +57,6 @@ define([
 
 		activeGroup,
 		putSortable,
-
-		autoScrolls = [],
-		scrolling = false,
 
 		awaitingDragStarted = false,
 		ignoreNextClick = false,
@@ -100,19 +103,26 @@ define([
 			passive: false
 		},
 
+		/*
 		IE11OrLess = !!navigator.userAgent.match(/(?:Trident.*rv[ :]?11\.|msie|iemobile)/i),
 		Edge = !!navigator.userAgent.match(/Edge/i),
 		FireFox = !!navigator.userAgent.match(/firefox/i),
 		Safari = !!(navigator.userAgent.match(/safari/i) && !navigator.userAgent.match(/chrome/i) && !navigator.userAgent.match(/android/i)),
-		IOS = !!(navigator.userAgent.match(/iP(ad|od|hone)/i)),
 
+		IOS = !!(navigator.userAgent.match(/iP(ad|od|hone)/i)),
+		*/
+		IE11OrLess = isBrowser && isBrowser.ie,
+		Edge = isBrowser && isBrowser.edge,
+		FireFox = isBrowser && isBrowser.firefox,
+		Safari = isBrowser && isBrowser.safari,
+
+		IOS = isMobile && isMobile.apple.device,
 		PositionGhostAbsolutely = isMobile.apple.device, //IOS
 
 		CSSFloatProperty = Edge || IE11OrLess ? 'cssFloat' : 'float',
 
 		// This will not pass for IE9, because IE9 DnD only works on anchors
-		supportDraggable = ('draggable' in document.createElement('div')) && !isMobile.apple.device
-,
+		supportDraggable = ('draggable' in document.createElement('div')) && !isMobile.apple.device,
 
 		/*
 		supportCssPointerEvents = (function() {
@@ -140,48 +150,8 @@ define([
 		 * Detects children direction.
 		 */
 		_detectDirection = function(el, options) {
-			var elCSS = styler.css(el),
-
-				elWidth = geom.contentRect(el).width,
-
-				child1 = _getChild(el, 0, options),
-				child2 = _getChild(el, 1, options),
-				firstChildCSS = child1 && styler.css(child1),
-				secondChildCSS = child2 && styler.css(child2),
-
-				firstChildWidth = child1 && geom.marginSize(child1).width,
-				secondChildWidth = child2 && geom.marginSize(child2).width;
-
-			if (elCSS.display === 'flex') {
-				return elCSS.flexDirection === 'column' || elCSS.flexDirection === 'column-reverse'
-				? 'vertical' : 'horizontal';
-			}
-
-			if (elCSS.display === 'grid') {
-				return elCSS.gridTemplateColumns.split(' ').length <= 1 ? 'vertical' : 'horizontal';
-			}
-
-			if (child1 && firstChildCSS.float !== 'none') {
-				var touchingSideChild2 = firstChildCSS.float === 'left' ? 'left' : 'right';
-
-				return child2 && (secondChildCSS.clear === 'both' || secondChildCSS.clear === touchingSideChild2) ?
-					'vertical' : 'horizontal';
-			}
-
-			return (child1 &&
-				(
-					firstChildCSS.display === 'block' ||
-					firstChildCSS.display === 'flex' ||
-					firstChildCSS.display === 'table' ||
-					firstChildCSS.display === 'grid' ||
-					firstChildWidth >= elWidth &&
-					elCSS[CSSFloatProperty] === 'none' ||
-					child2 &&
-					elCSS[CSSFloatProperty] === 'none' &&
-					firstChildWidth + secondChildWidth > elWidth
-				) ?
-				'vertical' : 'horizontal'
-			);
+			options.excluding = [ghostEl,dragEl];
+			return oriented(el,options);
 		},
 
 		/**
@@ -194,7 +164,7 @@ define([
 			for (var i = 0; i < sortables.length; i++) {
 				if (_lastChild(sortables[i])) continue;
 
-				var rect = _getRect(sortables[i]),
+				var rect = geom.boundingRect(sortables[i]),
 					threshold = sortables[i][expando].options.emptyInsertThreshold,
 					insideHorizontally = x >= (rect.left - threshold) && x <= (rect.right + threshold),
 					insideVertically = y >= (rect.top - threshold) && y <= (rect.bottom + threshold);
@@ -206,7 +176,7 @@ define([
 		},
 
 		_isClientInRowColumn = function(x, y, el, axis, options) {
-			var targetRect = _getRect(el),
+			var targetRect = geom.boundingRect(el),
 				targetS1Opp = axis === 'vertical' ? targetRect.left : targetRect.top,
 				targetS2Opp = axis === 'vertical' ? targetRect.right : targetRect.bottom,
 				mouseOnOppAxis = axis === 'vertical' ? x : y;
@@ -215,8 +185,8 @@ define([
 		},
 
 		_isElInRowColumn = function(el1, el2, axis) {
-			var el1Rect = el1 === dragEl && realDragElRect || _getRect(el1),
-				el2Rect = el2 === dragEl && realDragElRect || _getRect(el2),
+			var el1Rect = el1 === dragEl && realDragElRect || geom.boundingRect(el1),
+				el2Rect = el2 === dragEl && realDragElRect || geom.boundingRect(el2),
 				el1S1Opp = axis === 'vertical' ? el1Rect.left : el1Rect.top,
 				el1S2Opp = axis === 'vertical' ? el1Rect.right : el1Rect.bottom,
 				el1OppLength = axis === 'vertical' ? el1Rect.width : el1Rect.height,
@@ -231,172 +201,6 @@ define([
 			);
 		},
 
-		_getParentAutoScrollElement = function(el, includeSelf) {
-			// skip to window
-			if (!el || !el.getBoundingClientRect) return _getWindowScrollingElement();
-
-			var elem = el;
-			var gotSelf = false;
-			do {
-				// we don't need to get elem css if it isn't even overflowing in the first place (performance)
-				if (elem.clientWidth < elem.scrollWidth || elem.clientHeight < elem.scrollHeight) {
-					var elemCSS = styler.css(elem);
-					if (
-						elem.clientWidth < elem.scrollWidth && (elemCSS.overflowX == 'auto' || elemCSS.overflowX == 'scroll') ||
-						elem.clientHeight < elem.scrollHeight && (elemCSS.overflowY == 'auto' || elemCSS.overflowY == 'scroll')
-					) {
-						if (!elem || !elem.getBoundingClientRect || elem === document.body) return _getWindowScrollingElement();
-
-						if (gotSelf || includeSelf) return elem;
-						gotSelf = true;
-					}
-				}
-			/* jshint boss:true */
-			} while (elem = elem.parentNode);
-
-			return _getWindowScrollingElement();
-		},
-
-		_getWindowScrollingElement = function() {
-			if (IE11OrLess) {
-				return document.documentElement;
-			} else {
-				return document.scrollingElement;
-			}
-		},
-
-		_scrollBy = function(el, x, y) {
-			el.scrollLeft += x;
-			el.scrollTop += y;
-		},
-
-		_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback) {
-			// Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
-			if (options.scroll) {
-				var _this = rootEl ? rootEl[expando] : window,
-					sens = options.scrollSensitivity,
-					speed = options.scrollSpeed,
-
-					x = evt.clientX,
-					y = evt.clientY,
-
-					winScroller = _getWindowScrollingElement(),
-
-					scrollThisInstance = false;
-
-				// Detect scrollEl
-				if (scrollParentEl !== rootEl) {
-					_clearAutoScrolls();
-
-					scrollEl = options.scroll;
-					scrollCustomFn = options.scrollFn;
-
-					if (scrollEl === true) {
-						scrollEl = _getParentAutoScrollElement(rootEl, true);
-						scrollParentEl = scrollEl;
-					}
-				}
-
-
-				var layersOut = 0;
-				var currentParent = scrollEl;
-				do {
-					var	el = currentParent,
-						rect = _getRect(el),
-
-						top = rect.top,
-						bottom = rect.bottom,
-						left = rect.left,
-						right = rect.right,
-
-						width = rect.width,
-						height = rect.height,
-
-						scrollWidth,
-						scrollHeight,
-
-						css,
-
-						vx,
-						vy,
-
-						canScrollX,
-						canScrollY,
-
-						scrollPosX,
-						scrollPosY;
-
-
-					scrollWidth = el.scrollWidth;
-					scrollHeight = el.scrollHeight;
-
-					css = styler.css(el);
-
-					scrollPosX = el.scrollLeft;
-					scrollPosY = el.scrollTop;
-
-					if (el === winScroller) {
-						canScrollX = width < scrollWidth && (css.overflowX === 'auto' || css.overflowX === 'scroll' || css.overflowX === 'visible');
-						canScrollY = height < scrollHeight && (css.overflowY === 'auto' || css.overflowY === 'scroll' || css.overflowY === 'visible');
-					} else {
-						canScrollX = width < scrollWidth && (css.overflowX === 'auto' || css.overflowX === 'scroll');
-						canScrollY = height < scrollHeight && (css.overflowY === 'auto' || css.overflowY === 'scroll');
-					}
-
-					vx = canScrollX && (abs(right - x) <= sens && (scrollPosX + width) < scrollWidth) - (abs(left - x) <= sens && !!scrollPosX);
-
-					vy = canScrollY && (abs(bottom - y) <= sens && (scrollPosY + height) < scrollHeight) - (abs(top - y) <= sens && !!scrollPosY);
-
-
-					if (!autoScrolls[layersOut]) {
-						for (var i = 0; i <= layersOut; i++) {
-							if (!autoScrolls[i]) {
-								autoScrolls[i] = {};
-							}
-						}
-					}
-
-					if (autoScrolls[layersOut].vx != vx || autoScrolls[layersOut].vy != vy || autoScrolls[layersOut].el !== el) {
-						autoScrolls[layersOut].el = el;
-						autoScrolls[layersOut].vx = vx;
-						autoScrolls[layersOut].vy = vy;
-
-						clearInterval(autoScrolls[layersOut].pid);
-
-						if (el && (vx != 0 || vy != 0)) {
-							scrollThisInstance = true;
-							/* jshint loopfunc:true */
-							autoScrolls[layersOut].pid = setInterval((function () {
-								// emulate drag over during autoscroll (fallback), emulating native DnD behaviour
-								if (isFallback && this.layer === 0) {
-									Sortable.active._emulateDragOver(true);
-									Sortable.active._onTouchMove(touchEvt, true);
-								}
-								var scrollOffsetY = autoScrolls[this.layer].vy ? autoScrolls[this.layer].vy * speed : 0;
-								var scrollOffsetX = autoScrolls[this.layer].vx ? autoScrolls[this.layer].vx * speed : 0;
-
-								if ('function' === typeof(scrollCustomFn)) {
-									if (scrollCustomFn.call(_this, scrollOffsetX, scrollOffsetY, evt, touchEvt, autoScrolls[this.layer].el) !== 'continue') {
-										return;
-									}
-								}
-
-								_scrollBy(autoScrolls[this.layer].el, scrollOffsetX, scrollOffsetY);
-							}).bind({layer: layersOut}), 24);
-						}
-					}
-					layersOut++;
-				} while (options.bubbleScroll && currentParent !== winScroller && (currentParent = _getParentAutoScrollElement(currentParent, false)));
-				scrolling = scrollThisInstance; // in case another function catches scrolling as false in between when it is not
-			}
-		}, 30),
-
-		_clearAutoScrolls = function () {
-			autoScrolls.forEach(function(autoScroll) {
-				clearInterval(autoScroll.pid);
-			});
-			autoScrolls = [];
-		},
 
 		_prepareGroup = function (options) {
 			function toFn(value, pull) {
@@ -488,6 +292,319 @@ define([
 			}
 		}
 	};
+
+
+	function _find(ctx, tagName, iterator) {
+		if (ctx) {
+			var list = ctx.getElementsByTagName(tagName), i = 0, n = list.length;
+
+			if (iterator) {
+				for (; i < n; i++) {
+					iterator(list[i], i);
+				}
+			}
+
+			return list;
+		}
+
+		return [];
+	}
+
+	/**
+	 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
+	 * @param  {HTMLElement} el       Parent element
+	 * @return {HTMLElement}          The last child, ignoring ghostEl
+	 */
+	function _lastChild(el) {
+		/*
+		var last = el.lastElementChild;
+
+		while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
+			last = last.previousElementSibling;
+		}
+
+		return last || null;
+		*/
+		return finder.lastChild(el,{
+			ignoreHidden : true,
+			excluding : [ghostEl]
+		})
+	}
+
+	function _ghostIsLast(evt, axis, el) {
+		var elRect = geom.boundingRect(_lastChild(el)),
+			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
+			mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
+			targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
+			targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
+			targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
+			spacer = 10;
+
+		return (
+			axis === 'vertical' ?
+				(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
+				(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
+		);
+	}
+
+	function _getSwapDirection(evt, target, axis, swapThreshold, invertedSwapThreshold, invertSwap, isLastTarget) {
+		var targetRect = geom.boundingRect(target),
+			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
+			targetLength = axis === 'vertical' ? targetRect.height : targetRect.width,
+			targetS1 = axis === 'vertical' ? targetRect.top : targetRect.left,
+			targetS2 = axis === 'vertical' ? targetRect.bottom : targetRect.right,
+			dragRect = geom.boundingRect(dragEl),
+			invert = false;
+
+
+		if (!invertSwap) {
+			// Never invert or create dragEl shadow when target movemenet causes mouse to move past the end of regular swapThreshold
+			if (isLastTarget && targetMoveDistance < targetLength * swapThreshold) { // multiplied only by swapThreshold because mouse will already be inside target by (1 - threshold) * targetLength / 2
+				// check if past first invert threshold on side opposite of lastDirection
+				if (!pastFirstInvertThresh &&
+					(lastDirection === 1 ?
+						(
+							mouseOnAxis > targetS1 + targetLength * invertedSwapThreshold / 2
+						) :
+						(
+							mouseOnAxis < targetS2 - targetLength * invertedSwapThreshold / 2
+						)
+					)
+				)
+				{
+					// past first invert threshold, do not restrict inverted threshold to dragEl shadow
+					pastFirstInvertThresh = true;
+				}
+
+				if (!pastFirstInvertThresh) {
+					var dragS1 = axis === 'vertical' ? dragRect.top : dragRect.left,
+						dragS2 = axis === 'vertical' ? dragRect.bottom : dragRect.right;
+					// dragEl shadow (target move distance shadow)
+					if (
+						lastDirection === 1 ?
+						(
+							mouseOnAxis < targetS1 + targetMoveDistance // over dragEl shadow
+						) :
+						(
+							mouseOnAxis > targetS2 - targetMoveDistance
+						)
+					)
+					{
+						return lastDirection * -1;
+					}
+				} else {
+					invert = true;
+				}
+			} else {
+				// Regular
+				if (
+					mouseOnAxis > targetS1 + (targetLength * (1 - swapThreshold) / 2) &&
+					mouseOnAxis < targetS2 - (targetLength * (1 - swapThreshold) / 2)
+				) {
+					return _getInsertDirection(target);
+				}
+			}
+		}
+
+		invert = invert || invertSwap;
+
+		if (invert) {
+			// Invert of regular
+			if (
+				mouseOnAxis < targetS1 + (targetLength * invertedSwapThreshold / 2) ||
+				mouseOnAxis > targetS2 - (targetLength * invertedSwapThreshold / 2)
+			)
+			{
+				return ((mouseOnAxis > targetS1 + targetLength / 2) ? 1 : -1);
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Gets the direction dragEl must be swapped relative to target in order to make it
+	 * seem that dragEl has been "inserted" into that element's position
+	 * @param  {HTMLElement} target       The target whose position dragEl is being inserted at
+	 * @return {Number}                   Direction dragEl must be swapped
+	 */
+	function _getInsertDirection(target) {
+		var dragElIndex = _index(dragEl),
+			targetIndex = _index(target);
+
+		if (dragElIndex < targetIndex) {
+			return 1;
+		} else {
+			return -1;
+		}
+	}
+
+
+	/**
+	 * Generate id
+	 * @param   {HTMLElement} el
+	 * @returns {String}
+	 * @private
+	 */
+	function _generateId(el) {
+		var str = el.tagName + el.className + el.src + el.href + el.textContent,
+			i = str.length,
+			sum = 0;
+
+		while (i--) {
+			sum += str.charCodeAt(i);
+		}
+
+		return sum.toString(36);
+	}
+
+	/**
+	 * Returns the index of an element within its parent for a selected set of
+	 * elements
+	 * @param  {HTMLElement} el
+	 * @param  {selector} selector
+	 * @return {number}
+	 */
+	function _index(el, selector) {
+		return finder.index(el,function(el){
+			if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== cloneEl && (!selector || finder.matches(el, selector))) {
+				return true;
+			}
+
+			return false;			
+		})
+	}
+
+
+	function _saveInputCheckedState(root) {
+		savedInputChecked.length = 0;
+
+		var inputs = root.getElementsByTagName('input');
+		var idx = inputs.length;
+
+		while (idx--) {
+			var el = inputs[idx];
+			el.checked && savedInputChecked.push(el);
+		}
+	}
+
+	function _nextTick(fn) {
+		//return setTimeout(fn, 0);
+		return langx.defer(fn);
+	}
+
+	function _cancelNextTick(id) {
+		//return clearTimeout(id);
+		return id && id.stop();
+	}
+
+
+	/**
+	 * Returns the "bounding client rect" of given element
+	 * @param  {HTMLElement} el                The element whose boundingClientRect is wanted
+	 * @param  {[HTMLElement]} container       the parent the element will be placed in
+	 * @param  {[Boolean]} adjustForTransform  Whether the rect should compensate for parent's transform
+	 * @return {Object}                        The boundingClientRect of el
+	 */
+	function _getRect(el, adjustForTransform, container, adjustForFixed) {
+		if (!el.getBoundingClientRect && el !== win) return;
+
+		/*
+		var elRect,
+			top,
+			left,
+			bottom,
+			right,
+			height,
+			width;
+
+		if (el !== win && el !== scrollingElement()) {
+			elRect = el.getBoundingClientRect();
+			top = elRect.top;
+			left = elRect.left;
+			bottom = elRect.bottom;
+			right = elRect.right;
+			height = elRect.height;
+			width = elRect.width;
+		} else {
+			top = 0;
+			left = 0;
+			bottom = window.innerHeight;
+			right = window.innerWidth;
+			height = window.innerHeight;
+			width = window.innerWidth;
+		}
+
+		if (adjustForFixed && el !== win) {
+			// Adjust for translate()
+			container = container || el.parentNode;
+
+			// solves #1123 (see: https://stackoverflow.com/a/37953806/6088312)
+			// Not needed on <= IE11
+			if (!IE11OrLess) {
+				do {
+					if (container && container.getBoundingClientRect && styler.css(container, 'transform') !== 'none') {
+						var containerRect = container.getBoundingClientRect();
+
+						// Set relative to edges of padding box of container
+						top -= containerRect.top + parseInt(styler.css(container, 'border-top-width'));
+						left -= containerRect.left + parseInt(styler.css(container, 'border-left-width'));
+						bottom = top + elRect.height;
+						right = left + elRect.width;
+
+						break;
+					}
+					//jshint boss:true 
+				} while (container = container.parentNode);
+			}
+		}
+		*/
+		var {
+			top,
+			left,
+			bottom,
+			right,
+			width,
+			height
+		} = geom.boundingRect(el);
+		
+		if (adjustForTransform && el !== win) {
+			// Adjust for scale()
+			var matrix = transforms.matrix(container || el),
+				scaleX = matrix && matrix.a,
+				scaleY = matrix && matrix.d;
+
+			if (matrix) {
+				top /= scaleY;
+				left /= scaleX;
+
+				width /= scaleX;
+				height /= scaleY;
+
+				bottom = top + height;
+				right = left + width;
+			}
+		}
+
+		return {
+			top: top,
+			left: left,
+			bottom: bottom,
+			right: right,
+			width: width,
+			height: height
+		};
+	}
+
+
+
+	// Fixed #973:
+	eventer.on(document, 'touchmove', function(evt) {
+		if ((Sortable.active || awaitingDragStarted) && evt.cancelable) {
+			evt.preventDefault();
+		}
+	});
+
 
 	/**
 	 * @class  Sortable
@@ -711,55 +828,10 @@ define([
 
 
 		_handleAutoScroll: function(evt, fallback) {
+
 			if (!dragEl || !this.options.scroll) return;
-			var x = evt.clientX,
-				y = evt.clientY,
 
-				elem = document.elementFromPoint(x, y),
-				_this = this;
-
-			// IE does not seem to have native autoscroll,
-			// Edge's autoscroll seems too conditional,
-			// MACOS Safari does not have autoscroll,
-			// Firefox and Chrome are good
-			if (fallback || Edge || IE11OrLess || Safari) {
-				_throttleTimeout = _autoScroll(evt, _this.options, elem, fallback);
-
-				// Listener for pointer element change
-				var ogElemScroller = _getParentAutoScrollElement(elem, true);
-				if (
-					scrolling &&
-					(
-						!pointerElemChangedInterval ||
-						x !== lastPointerElemX ||
-						y !== lastPointerElemY
-					)
-				) {
-
-					pointerElemChangedInterval && clearInterval(pointerElemChangedInterval);
-					// Detect for pointer elem change, emulating native DnD behaviour
-					pointerElemChangedInterval = setInterval(function() {
-						if (!dragEl) return;
-						// could also check if scroll direction on newElem changes due to parent autoscrolling
-						var newElem = _getParentAutoScrollElement(document.elementFromPoint(x, y), true);
-						if (newElem !== ogElemScroller) {
-							ogElemScroller = newElem;
-							_clearAutoScrolls();
-							_throttleTimeout = _autoScroll(evt, _this.options, ogElemScroller, fallback);
-						}
-					}, 10);
-					lastPointerElemX = x;
-					lastPointerElemY = y;
-				}
-
-			} else {
-				// if DnD is enabled (and browser has good autoscrolling), first autoscroll will already scroll, so get parent autoscroll of first autoscroll
-				if (!_this.options.bubbleScroll || _getParentAutoScrollElement(elem, true) === _getWindowScrollingElement()) {
-					_clearAutoScrolls();
-					return;
-				}
-				_throttleTimeout = _autoScroll(evt, _this.options, _getParentAutoScrollElement(elem, false), false);
-			}
+			return autoscroll._handleAutoScroll(evt,this.options,fallback);
 		},
 
 		_prepareDragStart: function (/** Event */evt, /** Touch */touch, /** HTMLElement */target, /** Number */startIndex, /** Number */startDraggableIndex) {
@@ -872,6 +944,8 @@ define([
 			eventer.off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
 		},
 
+		//native dnd mode : register _OnDragStart for dragstart event handler 
+		//moused dnd mode : register  _onTouchMove for mousemove event hander, _onTouchMove calls _OnDragStart
 		_triggerDragStart: function (/** Event */evt, /** Touch */touch) {
 			log("_triggerDragStart","start");
 			log("_triggerDragStart","nativeDraggable is " +  this.nativeDraggable);
@@ -895,6 +969,8 @@ define([
 			}
 		},
 
+		//
+		//
 		_dragStarted: function (fallback, evt) {
 			awaitingDragStarted = false;
 			if (rootEl && dragEl) {
@@ -1047,12 +1123,12 @@ define([
 					}
 
 					if (ghostRelativeParent !== document.body && ghostRelativeParent !== document.documentElement) {
-						if (ghostRelativeParent === document) ghostRelativeParent = _getWindowScrollingElement();
+						if (ghostRelativeParent === document) ghostRelativeParent = scrollingElement();
 
 						rect.top += ghostRelativeParent.scrollTop;
 						rect.left += ghostRelativeParent.scrollLeft;
 					} else {
-						ghostRelativeParent = _getWindowScrollingElement();
+						ghostRelativeParent = scrollingElement();
 					}
 					ghostRelativeParentInitialScroll = _getRelativeScrollOffset(ghostRelativeParent);
 				}
@@ -1077,6 +1153,65 @@ define([
 
 				container.appendChild(ghostEl);
 			}
+		},
+
+
+		_animate: function (prevRect, target) {
+			var ms = this.options.animation;
+
+			if (ms) {
+				var currentRect = geom.boundingRect(target);
+
+				if (target === dragEl) {
+					realDragElRect = currentRect;
+				}
+
+				if (prevRect.nodeType === 1) {
+					prevRect = geom.boundingRect(prevRect);
+				}
+
+				// Check if actually moving position
+				if ((prevRect.left + prevRect.width / 2) !== (currentRect.left + currentRect.width / 2)
+					|| (prevRect.top + prevRect.height / 2) !== (currentRect.top + currentRect.height / 2)
+				) {
+					var matrix = transforms.matrix(this.el),
+						scaleX = matrix && matrix.a,
+						scaleY = matrix && matrix.d;
+
+					styler.css(target, 'transition', 'none');
+					styler.css(target, 'transform', 'translate3d('
+						+ (prevRect.left - currentRect.left) / (scaleX ? scaleX : 1) + 'px,'
+						+ (prevRect.top - currentRect.top) / (scaleY ? scaleY : 1) + 'px,0)'
+					);
+
+					this._repaint(target);
+					styler.css(target, 'transition', 'transform ' + ms + 'ms' + (this.options.easing ? ' ' + this.options.easing : ''));
+					styler.css(target, 'transform', 'translate3d(0,0,0)');
+				}
+
+				(typeof target.animated === 'number') && clearTimeout(target.animated);
+				target.animated = setTimeout(function () {
+					styler.css(target, 'transition', '');
+					styler.css(target, 'transform', '');
+					target.animated = false;
+				}, ms);
+			}
+		},
+
+		_repaint: function(target) {
+			return target.offsetWidth;
+		},
+
+		_offMoveEvents: function() {
+			eventer.off(document, 'dragover', nearestEmptyInsertDetectEvent);
+			eventer.off(document, 'mousemove', nearestEmptyInsertDetectEvent);
+		},
+
+		_offUpEvents: function () {
+			var ownerDocument = this.el.ownerDocument;
+
+			eventer.off(ownerDocument, 'mouseup', this._onDrop);
+			eventer.off(document, 'selectstart', this);
 		},
 
 		_onDragStart: function (/**Event*/evt, /**boolean*/fallback) {
@@ -1237,7 +1372,7 @@ define([
 			) {
 				var axis = this._getDirection(evt, target);
 
-				dragRect = _getRect(dragEl);
+				dragRect = geom.boundingRect(dragEl);
 
 				if (revert) {
 					this._hideClone();
@@ -1261,7 +1396,7 @@ define([
 					}
 
 					if (target) {
-						targetRect = _getRect(target);
+						targetRect = geom.boundingRect(target);
 					}
 
 					if (isOwner) {
@@ -1285,13 +1420,13 @@ define([
 						aligned = target.sortableMouseAligned,
 						differentLevel = dragEl.parentNode !== el,
 						side1 = axis === 'vertical' ? 'top' : 'left',
-						scrolledPastTop = _isScrolledPast(target, 'top') || _isScrolledPast(dragEl, 'top'),
+						scrolledPastTop = autoscroll._isScrolledPast(target, 'top') || autoscroll._isScrolledPast(dragEl, 'top'),
 						scrollBefore = scrolledPastTop ? scrolledPastTop.scrollTop : void 0;
 
 
 					if (lastTarget !== target) {
 						lastMode = null;
-						targetBeforeFirstSwap = _getRect(target)[side1];
+						targetBeforeFirstSwap = geom.boundingRect(target)[side1];
 						pastFirstInvertThresh = false;
 					}
 
@@ -1328,7 +1463,7 @@ define([
 
 					lastDirection = direction;
 
-					targetRect = _getRect(target);
+					targetRect = geom.boundingRect(target);
 
 					var nextSibling = target.nextElementSibling,
 						after = false;
@@ -1359,14 +1494,14 @@ define([
 
 						// Undo chrome's scroll adjustment
 						if (scrolledPastTop) {
-							_scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
+							geom.scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
 						}
 
 						parentEl = dragEl.parentNode; // actualization
 
 						// must be done before animation
 						if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
-							targetMoveDistance = abs(targetBeforeFirstSwap - _getRect(target)[side1]);
+							targetMoveDistance = abs(targetBeforeFirstSwap - geom.boundingRect(target)[side1]);
 						}
 						changed();
 
@@ -1382,70 +1517,6 @@ define([
 			return false;
 		},
 
-		_animate: function (prevRect, target) {
-			var ms = this.options.animation;
-
-			if (ms) {
-				var currentRect = _getRect(target);
-
-				if (target === dragEl) {
-					realDragElRect = currentRect;
-				}
-
-				if (prevRect.nodeType === 1) {
-					prevRect = _getRect(prevRect);
-				}
-
-				// Check if actually moving position
-				if ((prevRect.left + prevRect.width / 2) !== (currentRect.left + currentRect.width / 2)
-					|| (prevRect.top + prevRect.height / 2) !== (currentRect.top + currentRect.height / 2)
-				) {
-					var matrix = transforms.matrix(this.el),
-						scaleX = matrix && matrix.a,
-						scaleY = matrix && matrix.d;
-
-					styler.css(target, 'transition', 'none');
-					styler.css(target, 'transform', 'translate3d('
-						+ (prevRect.left - currentRect.left) / (scaleX ? scaleX : 1) + 'px,'
-						+ (prevRect.top - currentRect.top) / (scaleY ? scaleY : 1) + 'px,0)'
-					);
-
-					this._repaint(target);
-					styler.css(target, 'transition', 'transform ' + ms + 'ms' + (this.options.easing ? ' ' + this.options.easing : ''));
-					styler.css(target, 'transform', 'translate3d(0,0,0)');
-				}
-
-				(typeof target.animated === 'number') && clearTimeout(target.animated);
-				target.animated = setTimeout(function () {
-					styler.css(target, 'transition', '');
-					styler.css(target, 'transform', '');
-					target.animated = false;
-				}, ms);
-			}
-		},
-
-		_repaint: function(target) {
-			return target.offsetWidth;
-		},
-
-		_offMoveEvents: function() {
-			//eventer.off(document, 'touchmove', this._onTouchMove);
-			//eventer.off(document, 'pointermove', this._onTouchMove);
-			eventer.off(document, 'dragover', nearestEmptyInsertDetectEvent);
-			eventer.off(document, 'mousemove', nearestEmptyInsertDetectEvent);
-			//eventer.off(document, 'touchmove', nearestEmptyInsertDetectEvent);
-		},
-
-		_offUpEvents: function () {
-			var ownerDocument = this.el.ownerDocument;
-
-			eventer.off(ownerDocument, 'mouseup', this._onDrop);
-			//eventer.off(ownerDocument, 'touchend', this._onDrop);
-			//eventer.off(ownerDocument, 'pointerup', this._onDrop);
-			//eventer.off(ownerDocument, 'touchcancel', this._onDrop);
-			eventer.off(document, 'selectstart', this);
-		},
-
 		_onDrop: function (/**Event*/evt) {
 			var el = this.el,
 				options = this.options;
@@ -1457,8 +1528,9 @@ define([
 			clearInterval(this._loopId);
 
 			clearInterval(pointerElemChangedInterval);
-			_clearAutoScrolls();
-			_cancelThrottle();
+			
+			autoscroll._clearAutoScrolls();
+			autoscroll._cancelThrottle();
 
 			clearTimeout(this._dragStartTimer);
 
@@ -1571,7 +1643,7 @@ define([
 
 			scrollEl =
 			scrollParentEl =
-			autoScrolls.length =
+			autoscroll.autoScrolls.length =
 
 			pointerElemChangedInterval =
 			lastPointerElemX =
@@ -1719,8 +1791,7 @@ define([
 			el[expando] = null;
 
 			eventer.off(el, 'mousedown', this._onTapStart);
-			//eventer.off(el, 'touchstart', this._onTapStart);
-			//eventer.off(el, 'pointerdown', this._onTapStart);
+
 
 			if (this.nativeDraggable) {
 				eventer.off(el, 'dragover', this);
@@ -1781,25 +1852,6 @@ define([
 		evt.cancelable && evt.preventDefault();
 	}
 
-
-	function _find(ctx, tagName, iterator) {
-		if (ctx) {
-			var list = ctx.getElementsByTagName(tagName), i = 0, n = list.length;
-
-			if (iterator) {
-				for (; i < n; i++) {
-					iterator(list[i], i);
-				}
-			}
-
-			return list;
-		}
-
-		return [];
-	}
-
-
-
 	function _dispatchEvent(
 		sortable, rootEl, name,
 		targetEl, toEl, fromEl,
@@ -1846,7 +1898,7 @@ define([
 			dragged : dragEl,
 			draggedRect: dragRect,
 			related : targetEl || toEl,
-			relatedRect : targetRect || _getRect(toEl),
+			relatedRect : targetRect || geom.boundingRect(toEl),
 			willInsertAfter : willInsertAfter,
 			originalEvent : originalEvt
 		});
@@ -1868,385 +1920,6 @@ define([
 		_silent = false;
 	}
 
-	/**
-	 * Gets nth child of el, ignoring hidden children, sortable's elements (does not ignore clone if it's visible)
-	 * and non-draggable elements
-	 * @param  {HTMLElement} el       The parent element
-	 * @param  {Number} childNum      The index of the child
-	 * @param  {Object} options       Parent Sortable's options
-	 * @return {HTMLElement}          The child at index childNum, or null if not found
-	 */
-	function _getChild(el, childNum, options) {
-		var currentChild = 0,
-			i = 0,
-			children = el.children;
-
-		while (i < children.length) {
-			if (
-				children[i].style.display !== 'none' &&
-				children[i] !== ghostEl &&
-				children[i] !== dragEl &&
-				finder.closest(children[i], options.draggable, el, false)
-			) {
-				if (currentChild === childNum) {
-					return children[i];
-				}
-				currentChild++;
-			}
-
-			i++;
-		}
-		return null;
-	}
-
-	/**
-	 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
-	 * @param  {HTMLElement} el       Parent element
-	 * @return {HTMLElement}          The last child, ignoring ghostEl
-	 */
-	function _lastChild(el) {
-		var last = el.lastElementChild;
-
-		while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
-			last = last.previousElementSibling;
-		}
-
-		return last || null;
-	}
-
-	function _ghostIsLast(evt, axis, el) {
-		var elRect = _getRect(_lastChild(el)),
-			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
-			mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
-			targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
-			targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
-			targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
-			spacer = 10;
-
-		return (
-			axis === 'vertical' ?
-				(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
-				(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
-		);
-	}
-
-	function _getSwapDirection(evt, target, axis, swapThreshold, invertedSwapThreshold, invertSwap, isLastTarget) {
-		var targetRect = _getRect(target),
-			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
-			targetLength = axis === 'vertical' ? targetRect.height : targetRect.width,
-			targetS1 = axis === 'vertical' ? targetRect.top : targetRect.left,
-			targetS2 = axis === 'vertical' ? targetRect.bottom : targetRect.right,
-			dragRect = _getRect(dragEl),
-			invert = false;
-
-
-		if (!invertSwap) {
-			// Never invert or create dragEl shadow when target movemenet causes mouse to move past the end of regular swapThreshold
-			if (isLastTarget && targetMoveDistance < targetLength * swapThreshold) { // multiplied only by swapThreshold because mouse will already be inside target by (1 - threshold) * targetLength / 2
-				// check if past first invert threshold on side opposite of lastDirection
-				if (!pastFirstInvertThresh &&
-					(lastDirection === 1 ?
-						(
-							mouseOnAxis > targetS1 + targetLength * invertedSwapThreshold / 2
-						) :
-						(
-							mouseOnAxis < targetS2 - targetLength * invertedSwapThreshold / 2
-						)
-					)
-				)
-				{
-					// past first invert threshold, do not restrict inverted threshold to dragEl shadow
-					pastFirstInvertThresh = true;
-				}
-
-				if (!pastFirstInvertThresh) {
-					var dragS1 = axis === 'vertical' ? dragRect.top : dragRect.left,
-						dragS2 = axis === 'vertical' ? dragRect.bottom : dragRect.right;
-					// dragEl shadow (target move distance shadow)
-					if (
-						lastDirection === 1 ?
-						(
-							mouseOnAxis < targetS1 + targetMoveDistance // over dragEl shadow
-						) :
-						(
-							mouseOnAxis > targetS2 - targetMoveDistance
-						)
-					)
-					{
-						return lastDirection * -1;
-					}
-				} else {
-					invert = true;
-				}
-			} else {
-				// Regular
-				if (
-					mouseOnAxis > targetS1 + (targetLength * (1 - swapThreshold) / 2) &&
-					mouseOnAxis < targetS2 - (targetLength * (1 - swapThreshold) / 2)
-				) {
-					return _getInsertDirection(target);
-				}
-			}
-		}
-
-		invert = invert || invertSwap;
-
-		if (invert) {
-			// Invert of regular
-			if (
-				mouseOnAxis < targetS1 + (targetLength * invertedSwapThreshold / 2) ||
-				mouseOnAxis > targetS2 - (targetLength * invertedSwapThreshold / 2)
-			)
-			{
-				return ((mouseOnAxis > targetS1 + targetLength / 2) ? 1 : -1);
-			}
-		}
-
-		return 0;
-	}
-
-	/**
-	 * Gets the direction dragEl must be swapped relative to target in order to make it
-	 * seem that dragEl has been "inserted" into that element's position
-	 * @param  {HTMLElement} target       The target whose position dragEl is being inserted at
-	 * @return {Number}                   Direction dragEl must be swapped
-	 */
-	function _getInsertDirection(target) {
-		var dragElIndex = _index(dragEl),
-			targetIndex = _index(target);
-
-		if (dragElIndex < targetIndex) {
-			return 1;
-		} else {
-			return -1;
-		}
-	}
-
-
-	/**
-	 * Generate id
-	 * @param   {HTMLElement} el
-	 * @returns {String}
-	 * @private
-	 */
-	function _generateId(el) {
-		var str = el.tagName + el.className + el.src + el.href + el.textContent,
-			i = str.length,
-			sum = 0;
-
-		while (i--) {
-			sum += str.charCodeAt(i);
-		}
-
-		return sum.toString(36);
-	}
-
-	/**
-	 * Returns the index of an element within its parent for a selected set of
-	 * elements
-	 * @param  {HTMLElement} el
-	 * @param  {selector} selector
-	 * @return {number}
-	 */
-	function _index(el, selector) {
-		return finder.index(el,function(el){
-			if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== cloneEl && (!selector || finder.matches(el, selector))) {
-				return true;
-			}
-
-			return false;			
-		})
-	}
-
-
-	var _throttleTimeout;
-	function _throttle(callback, ms) {
-		return langx.debounce;
-	}
-
-	function _cancelThrottle() {
-		//clearTimeout(_throttleTimeout);
-		//_throttleTimeout = void 0;
-		if (_throttleTimeout && _throttleTimeout.stop) {
-			_throttleTimeout.stop();
-			_throttleTimeout = void 0;
-		}
-	}
-
-	function _saveInputCheckedState(root) {
-		savedInputChecked.length = 0;
-
-		var inputs = root.getElementsByTagName('input');
-		var idx = inputs.length;
-
-		while (idx--) {
-			var el = inputs[idx];
-			el.checked && savedInputChecked.push(el);
-		}
-	}
-
-	function _nextTick(fn) {
-		//return setTimeout(fn, 0);
-		return langx.defer(fn);
-	}
-
-	function _cancelNextTick(id) {
-		//return clearTimeout(id);
-		return id && id.stop();
-	}
-
-
-	/**
-	 * Returns the "bounding client rect" of given element
-	 * @param  {HTMLElement} el                The element whose boundingClientRect is wanted
-	 * @param  {[HTMLElement]} container       the parent the element will be placed in
-	 * @param  {[Boolean]} adjustForTransform  Whether the rect should compensate for parent's transform
-	 * @return {Object}                        The boundingClientRect of el
-	 */
-	function _getRect(el, adjustForTransform, container, adjustForFixed) {
-		if (!el.getBoundingClientRect && el !== win) return;
-
-		var elRect,
-			top,
-			left,
-			bottom,
-			right,
-			height,
-			width;
-
-		if (el !== win && el !== _getWindowScrollingElement()) {
-			elRect = el.getBoundingClientRect();
-			top = elRect.top;
-			left = elRect.left;
-			bottom = elRect.bottom;
-			right = elRect.right;
-			height = elRect.height;
-			width = elRect.width;
-		} else {
-			top = 0;
-			left = 0;
-			bottom = window.innerHeight;
-			right = window.innerWidth;
-			height = window.innerHeight;
-			width = window.innerWidth;
-		}
-
-		if (adjustForFixed && el !== win) {
-			// Adjust for translate()
-			container = container || el.parentNode;
-
-			// solves #1123 (see: https://stackoverflow.com/a/37953806/6088312)
-			// Not needed on <= IE11
-			if (!IE11OrLess) {
-				do {
-					if (container && container.getBoundingClientRect && styler.css(container, 'transform') !== 'none') {
-						var containerRect = container.getBoundingClientRect();
-
-						// Set relative to edges of padding box of container
-						top -= containerRect.top + parseInt(styler.css(container, 'border-top-width'));
-						left -= containerRect.left + parseInt(styler.css(container, 'border-left-width'));
-						bottom = top + elRect.height;
-						right = left + elRect.width;
-
-						break;
-					}
-					/* jshint boss:true */
-				} while (container = container.parentNode);
-			}
-		}
-
-		if (adjustForTransform && el !== win) {
-			// Adjust for scale()
-			var matrix = transforms.matrix(container || el),
-				scaleX = matrix && matrix.a,
-				scaleY = matrix && matrix.d;
-
-			if (matrix) {
-				top /= scaleY;
-				left /= scaleX;
-
-				width /= scaleX;
-				height /= scaleY;
-
-				bottom = top + height;
-				right = left + width;
-			}
-		}
-
-		return {
-			top: top,
-			left: left,
-			bottom: bottom,
-			right: right,
-			width: width,
-			height: height
-		};
-	}
-
-
-	/**
-	 * Checks if a side of an element is scrolled past a side of it's parents
-	 * @param  {HTMLElement}  el       The element who's side being scrolled out of view is in question
-	 * @param  {String}       side     Side of the element in question ('top', 'left', 'right', 'bottom')
-	 * @return {HTMLElement}           The parent scroll element that the el's side is scrolled past, or null if there is no such element
-	 */
-	function _isScrolledPast(el, side) {
-		var parent = _getParentAutoScrollElement(el, true),
-			elSide = _getRect(el)[side];
-
-		/* jshint boss:true */
-		while (parent) {
-			var parentSide = _getRect(parent)[side],
-				visible;
-
-			if (side === 'top' || side === 'left') {
-				visible = elSide >= parentSide;
-			} else {
-				visible = elSide <= parentSide;
-			}
-
-			if (!visible) return parent;
-
-			if (parent === _getWindowScrollingElement()) break;
-
-			parent = _getParentAutoScrollElement(parent, false);
-		}
-
-		return false;
-	}
-
-	/**
-	 * Returns the scroll offset of the given element, added with all the scroll offsets of parent elements.
-	 * The value is returned in real pixels.
-	 * @param  {HTMLElement} el
-	 * @return {Array}             Offsets in the format of [left, top]
-	 */
-	function _getRelativeScrollOffset(el) {
-		var offsetLeft = 0,
-			offsetTop = 0,
-			winScroller = _getWindowScrollingElement();
-
-		if (el) {
-			do {
-				var matrix = transforms.matrix(el),
-					scaleX = matrix.a,
-					scaleY = matrix.d;
-
-				offsetLeft += el.scrollLeft * scaleX;
-				offsetTop += el.scrollTop * scaleY;
-			} while (el !== winScroller && (el = el.parentNode));
-		}
-
-		return [offsetLeft, offsetTop];
-	}
-
-	// Fixed #973:
-	eventer.on(document, 'touchmove', function(evt) {
-		if ((Sortable.active || awaitingDragStarted) && evt.cancelable) {
-			evt.preventDefault();
-		}
-	});
-
 
 	// Export utils
 	Sortable.utils = {
@@ -2258,7 +1931,7 @@ define([
 			return !!finder.closest(el, selector, el, false);
 		},
 		extend: langx.mixin,
-		throttle: _throttle,
+		throttle: autoscroll._throttle,
 		closest: finder.closest,
 		toggleClass: styler.toggleClass,
 		clone: 	function (el) {
@@ -2268,7 +1941,11 @@ define([
 		nextTick: _nextTick,
 		cancelNextTick: _cancelNextTick,
 		detectDirection: _detectDirection,
-		getChild: _getChild
+		getChild: function(el, childNum, options) {
+			options.excluding = [];
+			options.closesting = options.draggable;
+			return finder.childAt(el,childNum,options);
+		}
 	};
 
 
