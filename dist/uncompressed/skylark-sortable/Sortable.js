@@ -347,97 +347,6 @@ define([
 		);
 	}
 
-	function _getSwapDirection(evt, target, axis, swapThreshold, invertedSwapThreshold, invertSwap, isLastTarget) {
-		var targetRect = geom.boundingRect(target),
-			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
-			targetLength = axis === 'vertical' ? targetRect.height : targetRect.width,
-			targetS1 = axis === 'vertical' ? targetRect.top : targetRect.left,
-			targetS2 = axis === 'vertical' ? targetRect.bottom : targetRect.right,
-			dragRect = geom.boundingRect(dragEl),
-			invert = false;
-
-
-		if (!invertSwap) {
-			// Never invert or create dragEl shadow when target movemenet causes mouse to move past the end of regular swapThreshold
-			if (isLastTarget && targetMoveDistance < targetLength * swapThreshold) { // multiplied only by swapThreshold because mouse will already be inside target by (1 - threshold) * targetLength / 2
-				// check if past first invert threshold on side opposite of lastDirection
-				if (!pastFirstInvertThresh &&
-					(lastDirection === 1 ?
-						(
-							mouseOnAxis > targetS1 + targetLength * invertedSwapThreshold / 2
-						) :
-						(
-							mouseOnAxis < targetS2 - targetLength * invertedSwapThreshold / 2
-						)
-					)
-				)
-				{
-					// past first invert threshold, do not restrict inverted threshold to dragEl shadow
-					pastFirstInvertThresh = true;
-				}
-
-				if (!pastFirstInvertThresh) {
-					var dragS1 = axis === 'vertical' ? dragRect.top : dragRect.left,
-						dragS2 = axis === 'vertical' ? dragRect.bottom : dragRect.right;
-					// dragEl shadow (target move distance shadow)
-					if (
-						lastDirection === 1 ?
-						(
-							mouseOnAxis < targetS1 + targetMoveDistance // over dragEl shadow
-						) :
-						(
-							mouseOnAxis > targetS2 - targetMoveDistance
-						)
-					)
-					{
-						return lastDirection * -1;
-					}
-				} else {
-					invert = true;
-				}
-			} else {
-				// Regular
-				if (
-					mouseOnAxis > targetS1 + (targetLength * (1 - swapThreshold) / 2) &&
-					mouseOnAxis < targetS2 - (targetLength * (1 - swapThreshold) / 2)
-				) {
-					return _getInsertDirection(target);
-				}
-			}
-		}
-
-		invert = invert || invertSwap;
-
-		if (invert) {
-			// Invert of regular
-			if (
-				mouseOnAxis < targetS1 + (targetLength * invertedSwapThreshold / 2) ||
-				mouseOnAxis > targetS2 - (targetLength * invertedSwapThreshold / 2)
-			)
-			{
-				return ((mouseOnAxis > targetS1 + targetLength / 2) ? 1 : -1);
-			}
-		}
-
-		return 0;
-	}
-
-	/**
-	 * Gets the direction dragEl must be swapped relative to target in order to make it
-	 * seem that dragEl has been "inserted" into that element's position
-	 * @param  {HTMLElement} target       The target whose position dragEl is being inserted at
-	 * @return {Number}                   Direction dragEl must be swapped
-	 */
-	function _getInsertDirection(target) {
-		var dragElIndex = _index(dragEl),
-			targetIndex = _index(target);
-
-		if (dragElIndex < targetIndex) {
-			return 1;
-		} else {
-			return -1;
-		}
-	}
 
 
 	/**
@@ -508,57 +417,6 @@ define([
 	 */
 	function _getRect(el, adjustForTransform, container, adjustForFixed) {
 		if (!el.getBoundingClientRect && el !== win) return;
-
-		/*
-		var elRect,
-			top,
-			left,
-			bottom,
-			right,
-			height,
-			width;
-
-		if (el !== win && el !== scrollingElement()) {
-			elRect = el.getBoundingClientRect();
-			top = elRect.top;
-			left = elRect.left;
-			bottom = elRect.bottom;
-			right = elRect.right;
-			height = elRect.height;
-			width = elRect.width;
-		} else {
-			top = 0;
-			left = 0;
-			bottom = window.innerHeight;
-			right = window.innerWidth;
-			height = window.innerHeight;
-			width = window.innerWidth;
-		}
-
-		if (adjustForFixed && el !== win) {
-			// Adjust for translate()
-			container = container || el.parentNode;
-
-			// solves #1123 (see: https://stackoverflow.com/a/37953806/6088312)
-			// Not needed on <= IE11
-			if (!IE11OrLess) {
-				do {
-					if (container && container.getBoundingClientRect && styler.css(container, 'transform') !== 'none') {
-						var containerRect = container.getBoundingClientRect();
-
-						// Set relative to edges of padding box of container
-						top -= containerRect.top + parseInt(styler.css(container, 'border-top-width'));
-						left -= containerRect.left + parseInt(styler.css(container, 'border-left-width'));
-						bottom = top + elRect.height;
-						right = left + elRect.width;
-
-						break;
-					}
-					//jshint boss:true 
-				} while (container = container.parentNode);
-			}
-		}
-		*/
 		var {
 			top,
 			left,
@@ -1339,6 +1197,99 @@ define([
 				_dispatchEvent(_this, rootEl, 'change', target, el, rootEl, oldIndex, _index(dragEl), oldDraggableIndex, _index(dragEl, options.draggable), evt);
 			}
 
+
+			/**
+			 * Gets the direction dragEl must be swapped relative to target in order to make it
+			 * seem that dragEl has been "inserted" into that element's position
+			 * @param  {HTMLElement} target       The target whose position dragEl is being inserted at
+			 * @return {Number}                   Direction dragEl must be swapped
+			 */
+			function _getInsertDirection(target) {
+				var dragElIndex = _index(dragEl),
+					targetIndex = _index(target);
+
+				if (dragElIndex < targetIndex) {
+					return 1;
+				} else {
+					return -1;
+				}
+			}
+
+
+			function _getSwapDirection(evt, target, axis, swapThreshold, invertedSwapThreshold, invertSwap, isLastTarget) {
+				var targetRect = geom.boundingRect(target),
+					mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
+					targetLength = axis === 'vertical' ? targetRect.height : targetRect.width,
+					targetS1 = axis === 'vertical' ? targetRect.top : targetRect.left,
+					targetS2 = axis === 'vertical' ? targetRect.bottom : targetRect.right,
+					dragRect = geom.boundingRect(dragEl),
+					invert = false;
+
+
+				if (!invertSwap) {
+					// Never invert or create dragEl shadow when target movemenet causes mouse to move past the end of regular swapThreshold
+					if (isLastTarget && targetMoveDistance < targetLength * swapThreshold) { // multiplied only by swapThreshold because mouse will already be inside target by (1 - threshold) * targetLength / 2
+						// check if past first invert threshold on side opposite of lastDirection
+						if (!pastFirstInvertThresh &&
+							(lastDirection === 1 ?
+								(
+									mouseOnAxis > targetS1 + targetLength * invertedSwapThreshold / 2
+								) :
+								(
+									mouseOnAxis < targetS2 - targetLength * invertedSwapThreshold / 2
+								)
+							)
+						)
+						{
+							// past first invert threshold, do not restrict inverted threshold to dragEl shadow
+							pastFirstInvertThresh = true;
+						}
+
+						if (!pastFirstInvertThresh) {
+							var dragS1 = axis === 'vertical' ? dragRect.top : dragRect.left,
+								dragS2 = axis === 'vertical' ? dragRect.bottom : dragRect.right;
+							// dragEl shadow (target move distance shadow)
+							if (
+								lastDirection === 1 ?
+								(
+									mouseOnAxis < targetS1 + targetMoveDistance // over dragEl shadow
+								) :
+								(
+									mouseOnAxis > targetS2 - targetMoveDistance
+								)
+							)
+							{
+								return lastDirection * -1;
+							}
+						} else {
+							invert = true;
+						}
+					} else {
+						// Regular
+						if (
+							mouseOnAxis > targetS1 + (targetLength * (1 - swapThreshold) / 2) &&
+							mouseOnAxis < targetS2 - (targetLength * (1 - swapThreshold) / 2)
+						) {
+							return _getInsertDirection(target);
+						}
+					}
+				}
+
+				invert = invert || invertSwap;
+
+				if (invert) {
+					// Invert of regular
+					if (
+						mouseOnAxis < targetS1 + (targetLength * invertedSwapThreshold / 2) ||
+						mouseOnAxis > targetS2 - (targetLength * invertedSwapThreshold / 2)
+					)
+					{
+						return ((mouseOnAxis > targetS1 + targetLength / 2) ? 1 : -1);
+					}
+				}
+
+				return 0;
+			}
 
 			if (evt.preventDefault !== void 0) {
 				evt.cancelable && evt.preventDefault();
