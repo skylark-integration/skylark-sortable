@@ -16,7 +16,8 @@ define([
 	"skylark-devices-points/touch",
 	"./autoscroll",
 	"./containers",
-	"./dnd"
+	"./dnd",
+	"./ghoster"
 ],function(
 	skylark,
 	langx,
@@ -35,7 +36,8 @@ define([
 	touch,
 	autoscroll,
 	containers,
-	dnd
+	dnd,
+	ghoster
 ){
 	function log(category,message) {
 		$("#console").append("<div>"+category+":"+message+"</div>");	
@@ -75,7 +77,6 @@ define([
 
 		moved,
 
-
 		lastTarget,
 		lastDirection,
 		pastFirstInvertThresh = false,
@@ -84,9 +85,6 @@ define([
 
 		targetMoveDistance,
 
-		// For positioning ghost absolutely
-		ghostRelativeParent,
-		ghostRelativeParentInitialScroll = [], // (left, top)
 
 		realDragElRect, // dragEl rect after current animation
 
@@ -119,9 +117,8 @@ define([
 		Safari = isBrowser && isBrowser.safari,
 
 		IOS = isMobile && isMobile.apple.device,
-		PositionGhostAbsolutely = isMobile.apple.device, //IOS
 
-		CSSFloatProperty = Edge || IE11OrLess ? 'cssFloat' : 'float',
+		//CSSFloatProperty = Edge || IE11OrLess ? 'cssFloat' : 'float',
 
 		// This will not pass for IE9, because IE9 DnD only works on anchors
 		supportDraggable = ('draggable' in document.createElement('div')) && !isMobile.apple.device,
@@ -234,44 +231,6 @@ define([
 		return [];
 	}
 
-	/**
-	 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
-	 * @param  {HTMLElement} el       Parent element
-	 * @return {HTMLElement}          The last child, ignoring ghostEl
-	 */
-	function _lastChild(el) {
-		/*
-		var last = el.lastElementChild;
-
-		while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
-			last = last.previousElementSibling;
-		}
-
-		return last || null;
-		*/
-		return finder.lastChild(el,{
-			ignoreHidden : true,
-			excluding : [dnd.ghostEl]
-		})
-	}
-
-	function _ghostIsLast(evt, axis, el) {
-		var elRect = geom.boundingRect(_lastChild(el)),
-			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
-			mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
-			targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
-			targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
-			targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
-			spacer = 10;
-
-		return (
-			axis === 'vertical' ?
-				(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
-				(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
-		);
-	}
-
-
 
 	/**
 	 * Generate id
@@ -312,53 +271,6 @@ define([
 	function _cancelNextTick(id) {
 		//return clearTimeout(id);
 		return id && id.stop();
-	}
-
-
-	/**
-	 * Returns the "bounding client rect" of given element
-	 * @param  {HTMLElement} el                The element whose boundingClientRect is wanted
-	 * @param  {[HTMLElement]} container       the parent the element will be placed in
-	 * @param  {[Boolean]} adjustForTransform  Whether the rect should compensate for parent's transform
-	 * @return {Object}                        The boundingClientRect of el
-	 */
-	function _getRect(el, adjustForTransform, container, adjustForFixed) {
-		if (!el.getBoundingClientRect && el !== win) return;
-		var {
-			top,
-			left,
-			bottom,
-			right,
-			width,
-			height
-		} = geom.boundingRect(el);
-		
-		if (adjustForTransform && el !== win) {
-			// Adjust for scale()
-			var matrix = transforms.matrix(container || el),
-				scaleX = matrix && matrix.a,
-				scaleY = matrix && matrix.d;
-
-			if (matrix) {
-				top /= scaleY;
-				left /= scaleX;
-
-				width /= scaleX;
-				height /= scaleY;
-
-				bottom = top + height;
-				right = left + width;
-			}
-		}
-
-		return {
-			top: top,
-			left: left,
-			bottom: bottom,
-			right: right,
-			width: width,
-			height: height
-		};
 	}
 
 
@@ -515,7 +427,7 @@ define([
 		_getDirection: function(evt, target) {
 			var  dragEl = dnd.dragEl;
 
-			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,dnd.ghostEl) : this.options.direction;
+			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,ghoster.ghostEl) : this.options.direction;
 		},
 
 
@@ -772,7 +684,7 @@ define([
 
 		_onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
 			log("_onTouchMove","start");
-			var ghostEl = dnd.ghostEl;
+			var ghostEl = ghoster.ghostEl;
 			if (tapEvt) {
 				var	options = this.options,
 					fallbackTolerance = options.fallbackTolerance,
@@ -781,7 +693,7 @@ define([
 					matrix = ghostEl && transforms.matrix(ghostEl),
 					scaleX = ghostEl && matrix && matrix.a,
 					scaleY = ghostEl && matrix && matrix.d,
-					relativeScrollOffset = PositionGhostAbsolutely && ghostRelativeParent && autoscroll._getRelativeScrollOffset(ghostRelativeParent),
+					relativeScrollOffset = ghoster.getRelativeScrollOffset(),
 					dx = ((touch.clientX - tapEvt.clientX)
 							+ fallbackOffset.x) / (scaleX || 1)
 							+ (relativeScrollOffset ? (relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0]) : 0) / (scaleX || 1),
@@ -821,66 +733,8 @@ define([
 		_appendGhost: function () {
 			// Bug if using scale(): https://stackoverflow.com/questions/2637058
 			// Not being adjusted for
-			var  dragEl = dnd.dragEl,
-				ghostEl = dnd.ghostEl;
-
-			if (!ghostEl) {
-				var container = this.options.fallbackOnBody ? document.body : rootEl,
-					rect = _getRect(dragEl, true, container, !PositionGhostAbsolutely),
-					css = styler.css(dragEl),
-					options = this.options;
-
-				// Position absolutely
-				if (PositionGhostAbsolutely) {
-					// Get relatively positioned parent
-					ghostRelativeParent = container;
-
-					while (
-						styler.css(ghostRelativeParent, 'position') === 'static' &&
-						styler.css(ghostRelativeParent, 'transform') === 'none' &&
-						ghostRelativeParent !== document
-					) {
-						ghostRelativeParent = ghostRelativeParent.parentNode;
-					}
-
-					if (ghostRelativeParent !== document) {
-						var ghostRelativeParentRect = _getRect(ghostRelativeParent, true);
-
-						rect.top -= ghostRelativeParentRect.top;
-						rect.left -= ghostRelativeParentRect.left;
-					}
-
-					if (ghostRelativeParent !== document.body && ghostRelativeParent !== document.documentElement) {
-						if (ghostRelativeParent === document) ghostRelativeParent = scrollingElement();
-
-						rect.top += ghostRelativeParent.scrollTop;
-						rect.left += ghostRelativeParent.scrollLeft;
-					} else {
-						ghostRelativeParent = scrollingElement();
-					}
-					ghostRelativeParentInitialScroll = autoscroll._getRelativeScrollOffset(ghostRelativeParent);
-				}
-
-
-				ghostEl =dnd.ghostEl = dragEl.cloneNode(true);
-
-				styler.toggleClass(ghostEl, options.ghostClass, false);
-				styler.toggleClass(ghostEl, options.fallbackClass, true);
-				styler.toggleClass(ghostEl, options.dragClass, true);
-
-				styler.css(ghostEl, 'box-sizing', 'border-box');
-				styler.css(ghostEl, 'margin', 0);
-				styler.css(ghostEl, 'top', rect.top);
-				styler.css(ghostEl, 'left', rect.left);
-				styler.css(ghostEl, 'width', rect.width);
-				styler.css(ghostEl, 'height', rect.height);
-				styler.css(ghostEl, 'opacity', '0.8');
-				styler.css(ghostEl, 'position', (PositionGhostAbsolutely ? 'absolute' : 'fixed'));
-				styler.css(ghostEl, 'zIndex', '100000');
-				styler.css(ghostEl, 'pointerEvents', 'none');
-
-				container.appendChild(ghostEl);
-			}
+			var container = this.options.fallbackOnBody ? document.body : rootEl;
+			return ghoster._appendGhost(dnd.dragEl,container,this.options);
 		},
 
 
@@ -1213,9 +1067,9 @@ define([
 					return completed(true);
 				}
 
-				var elLastChild = _lastChild(el);
+				var elLastChild = ghoster._lastChild(el);
 
-				if (!elLastChild || _ghostIsLast(evt, axis, el) && !elLastChild.animated) {
+				if (!elLastChild || ghoster._ghostIsLast(evt, axis, el) && !elLastChild.animated) {
 					// assign target only if condition is true
 					if (elLastChild && el === evt.target) {
 						target = elLastChild;
@@ -1390,7 +1244,7 @@ define([
 					!options.dropBubble && evt.stopPropagation();
 				}
 
-				dnd.ghostEl && dnd.ghostEl.parentNode && dnd.ghostEl.parentNode.removeChild(dnd.ghostEl);
+				ghoster.ghostEl && ghoster.ghostEl.parentNode && ghoster.ghostEl.parentNode.removeChild(ghoster.ghostEl);
 
 				if (rootEl === parentEl || (putSortable && putSortable.lastPutMode !== 'clone')) {
 					// Remove clone
@@ -1465,7 +1319,7 @@ define([
 			rootEl =
 			dnd.dragEl =
 			parentEl =
-			dnd.ghostEl =
+			ghoster.ghostEl =
 			nextEl =
 			dnd.cloneEl =
 			lastDownEl =
@@ -1589,7 +1443,6 @@ define([
 			return finder.closest(el, selector || this.options.draggable, this.el, false);
 		},
 
-
 		/**
 		 * Set/get option
 		 * @param   {string} name
@@ -1690,33 +1543,6 @@ define([
 		_silent = false;
 	}
 
-
-	// Export utils
-	Sortable.utils = {
-		on: eventer.on,
-		off: eventer.off,
-		css: styler.css,
-		find: _find,
-		is: function (el, selector) {
-			return !!finder.closest(el, selector, el, false);
-		},
-		extend: langx.mixin,
-		throttle: autoscroll._throttle,
-		closest: finder.closest,
-		toggleClass: styler.toggleClass,
-		clone: 	function (el) {
-					return noder.clone(el,true);
-				},
-		index: containers._index,
-		nextTick: _nextTick,
-		cancelNextTick: _cancelNextTick,
-		//detectDirection: _detectDirection,
-		getChild: function(el, childNum, options) {
-			options.excluding = [];
-			options.closesting = options.draggable;
-			return finder.childAt(el,childNum,options);
-		}
-	};
 
 
 	/**
