@@ -3,16 +3,19 @@ define([
 	"skylark-langx-hoster/isBrowser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
-	"skylark-domx-scrolls/scrollingElement"
+	"skylark-domx-scrolls/scrollingElement",
+	"./dnd"
 ],function(
 	langx,
 	isBrowser,
 	geom,
 	styler,
-	scrollingElement
+	scrollingElement,
+	dnd
 ){
 	var autoScrolls = [],
-		scrolling = false;
+		scrolling = false,
+		scrollParentEl = null;
 
 	var
 		IE11OrLess = isBrowser && isBrowser.ie,
@@ -107,7 +110,7 @@ define([
 	_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback) {
 		// Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
 		if (options.scroll) {
-			var _this = rootEl ? rootEl[expando] : window,
+			var _this = rootEl ? rootEl[dnd.expando] : window,
 				sens = options.scrollSensitivity,
 				speed = options.scrollSpeed,
 

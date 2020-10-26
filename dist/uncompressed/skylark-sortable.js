@@ -313,9 +313,9 @@ define('skylark-domx-layouts/oriented',[
 				firstChildCSS.display === 'table' ||
 				firstChildCSS.display === 'grid' ||
 				firstChildWidth >= elWidth &&
-				elCSS[CSSFloatProperty] === 'none' ||
+				elCSS.float === 'none' ||
 				child2 &&
-				elCSS[CSSFloatProperty] === 'none' &&
+				elCSS.float === 'none' &&
 				firstChildWidth + secondChildWidth > elWidth
 			) ?
 			Orientation.Vertical : Orientation.Horizontal
@@ -324,21 +324,257 @@ define('skylark-domx-layouts/oriented',[
 
 	return oriented;
 });
+define('skylark-sortable/dnd',[
+	"skylark-langx/skylark",
+	"skylark-langx/langx",
+	"skylark-langx-hoster/isBrowser",
+	"skylark-langx-hoster/isMobile",
+	"skylark-domx-query",
+	"skylark-domx-browser",
+	"skylark-domx-noder",
+	"skylark-domx-finder",
+	"skylark-domx-geom",
+	"skylark-domx-styler",
+	"skylark-domx-eventer",
+	"skylark-domx-transforms",
+	"skylark-domx-scrolls/scrollingElement",
+	"skylark-domx-layouts/oriented",
+	"skylark-devices-points/touch"
+],function(
+	skylark,
+	langx,
+	isBrowser,
+	isMobile,
+	$,
+	browser,
+	noder,
+	finder,
+	geom,
+	styler,
+	eventer,
+	transforms,
+	scrollingElement,
+	oriented,
+	touch
+){
+
+	var expando = 'Sortable' + (new Date).getTime();
+
+
+	var dnd = {
+		expando,
+
+		active : null,
+		putSortable : null,
+		sortables : [],
+
+
+		dragEl : null,
+		cloneEl : null,
+
+		touchEvt : null,
+
+        prepare: function(draggable) {
+			var el = draggable.el,
+				ownerDocument = el.ownerDocument;
+
+			eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
+			eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
+			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
+		},
+
+        start: function(draggable, event) {
+        },
+
+        over : function() {
+
+        },
+
+        end: function(dropped) {
+ 		},
+
+		nearestEmptyInsertDetectEvent :function (evt) {
+			if (dnd.dragEl) {
+				evt = evt.touches ? evt.touches[0] : evt;
+				var nearest = dnd._detectNearestEmptySortable(evt.clientX, evt.clientY);
+
+				if (nearest) {
+					// Create imitation event
+					var event = {};
+					for (var i in evt) {
+						event[i] = evt[i];
+					}
+					event.target = event.rootEl = nearest;
+					event.preventDefault = void 0;
+					event.stopPropagation = void 0;
+					nearest[expando]._onDragOver(event);
+				}
+			}
+		}, 
+
+		/**
+		 * Detects first nearest empty sortable to X and Y position using emptyInsertThreshold.
+		 * @param  {Number} x      X position
+		 * @param  {Number} y      Y position
+		 * @return {HTMLElement}   Element of the first found nearest Sortable
+		 */
+		_detectNearestEmptySortable : function(x, y) {
+			var sortables = this.sortables;
+
+			for (var i = 0; i < sortables.length; i++) {
+				if (finder.lastChild(sortables[i],{ignoreHidden : true,excluding : [this.ghostEl]})) continue;
+
+				var rect = geom.boundingRect(sortables[i]),
+					threshold = sortables[i][expando].options.emptyInsertThreshold,
+					insideHorizontally = x >= (rect.left - threshold) && x <= (rect.right + threshold),
+					insideVertically = y >= (rect.top - threshold) && y <= (rect.bottom + threshold);
+
+				if (threshold && insideHorizontally && insideVertically) {
+					return sortables[i];
+				}
+			}
+		},
+
+		_checkAlignment : function(evt) {
+			if (!this.dragEl || !this.dragEl.parentNode) return;
+			this.dragEl.parentNode[expando] && this.dragEl.parentNode[expando]._computeIsAligned(evt);
+		},
+
+		_emulateDragOver: function (forAutoScroll) {
+			var dragEl = this.dragEl,
+				touchEvt = this.touchEvt;
+
+			if (touchEvt) {
+				if (this._lastX === touchEvt.clientX && this._lastY === touchEvt.clientY && !forAutoScroll) {
+					return;
+				}
+				this._lastX = touchEvt.clientX;
+				this._lastY = touchEvt.clientY;
+
+				//_hideGhostForTarget();
+
+				var target = document.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+				var parent = target;
+
+				while (target && target.shadowRoot) {
+					target = target.shadowRoot.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+					if (target === parent) break;
+					parent = target;
+				}
+
+				if (parent) {
+					do {
+						if (parent[expando]) {
+							var inserted;
+
+							inserted = parent[expando]._onDragOver({
+								clientX: touchEvt.clientX,
+								clientY: touchEvt.clientY,
+								target: target,
+								rootEl: parent
+							});
+
+							//if (inserted && !this.options.dragoverBubble) {
+							if (inserted) {
+								break;
+							}
+						}
+
+						target = parent; // store last element
+					}
+					/* jshint boss:true */
+					while (parent = parent.parentNode);
+				}
+				dragEl.parentNode[expando]._computeIsAligned(touchEvt);
+
+				//_unhideGhostForTarget();
+			}
+		},
+
+		_onMove : function (fromEl, toEl, dragEl, dragRect, targetEl, targetRect, originalEvt, willInsertAfter) {
+			var evt,
+				sortable = fromEl[expando],
+				onMoveFn = sortable.options.onMove,
+				retVal;
+
+			evt = eventer.create("move",{
+				to : toEl,
+				from : fromEl,
+				dragged : dragEl,
+				draggedRect: dragRect,
+				related : targetEl || toEl,
+				relatedRect : targetRect || geom.boundingRect(toEl),
+				willInsertAfter : willInsertAfter,
+				originalEvent : originalEvt
+			});
+
+			fromEl.dispatchEvent(evt);
+
+			if (onMoveFn) {
+				retVal = onMoveFn.call(sortable, evt, originalEvt);
+			}
+
+			return retVal;
+		},
+
+		_dispatchEvent : function (
+			sortable, rootEl, name,
+			targetEl, toEl, fromEl,
+			startIndex, newIndex,
+			startDraggableIndex, newDraggableIndex,
+			originalEvt
+		) {
+			sortable = (sortable || rootEl[expando]);
+			var evt,
+				options = sortable.options,
+				onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1),
+				putSortable = this.putSortable;
+
+			evt = eventer.create(name,{
+				to : toEl || rootEl,
+				from : fromEl || rootEl,
+				item : targetEl || rootEl,
+				clone : this.cloneEl,
+				oldIndex : startIndex,
+				newIndex : newIndex,
+				oldDraggableIndex : startDraggableIndex,
+				newDraggableIndex : newDraggableIndex,
+				originalEvent : originalEvt,
+				pullMode : putSortable ? putSortable.lastPutMode : undefined
+			});
+			if (rootEl) {
+				rootEl.dispatchEvent(evt);
+			}
+
+			if (options[onName]) {
+				options[onName].call(sortable, evt);
+			}
+		}
+
+	};
+
+
+	return dnd;
+	
+});
 define('skylark-sortable/autoscroll',[
 	"skylark-langx/langx",
 	"skylark-langx-hoster/isBrowser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
-	"skylark-domx-scrolls/scrollingElement"
+	"skylark-domx-scrolls/scrollingElement",
+	"./dnd"
 ],function(
 	langx,
 	isBrowser,
 	geom,
 	styler,
-	scrollingElement
+	scrollingElement,
+	dnd
 ){
 	var autoScrolls = [],
-		scrolling = false;
+		scrolling = false,
+		scrollParentEl = null;
 
 	var
 		IE11OrLess = isBrowser && isBrowser.ie,
@@ -433,7 +669,7 @@ define('skylark-sortable/autoscroll',[
 	_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback) {
 		// Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
 		if (options.scroll) {
-			var _this = rootEl ? rootEl[expando] : window,
+			var _this = rootEl ? rootEl[dnd.expando] : window,
 				sens = options.scrollSensitivity,
 				speed = options.scrollSpeed,
 
@@ -638,7 +874,7 @@ define('skylark-sortable/autoscroll',[
 		_cancelThrottle
 	}
 });
-define('skylark-sortable/Sortable',[
+define('skylark-sortable/containers',[
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
 	"skylark-langx-hoster/isBrowser",
@@ -654,7 +890,8 @@ define('skylark-sortable/Sortable',[
 	"skylark-domx-scrolls/scrollingElement",
 	"skylark-domx-layouts/oriented",
 	"skylark-devices-points/touch",
-	"./autoscroll"
+	"./autoscroll",
+	"./dnd"
 ],function(
 	skylark,
 	langx,
@@ -671,23 +908,117 @@ define('skylark-sortable/Sortable',[
 	scrollingElement,
 	oriented,
 	touch,
-	autoscroll
+	autoscroll,
+	dnd
+){
+	var
+		/**
+		 * Returns the index of an element within its parent for a selected set of
+		 * elements
+		 * @param  {HTMLElement} el
+		 * @param  {selector} selector
+		 * @return {number}
+		 */
+		_index = function (el, selector) {
+			return finder.index(el,function(el){
+				if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== dnd.cloneEl && (!selector || finder.matches(el, selector))) {
+					return true;
+				}
+
+				return false;			
+			})
+		},
+
+		_isClientInRowColumn = function(x, y, el, axis, options) {
+			var targetRect = geom.boundingRect(el),
+				targetS1Opp = axis === 'vertical' ? targetRect.left : targetRect.top,
+				targetS2Opp = axis === 'vertical' ? targetRect.right : targetRect.bottom,
+				mouseOnOppAxis = axis === 'vertical' ? x : y;
+
+			return targetS1Opp < mouseOnOppAxis && mouseOnOppAxis < targetS2Opp;
+		},
+
+		_isElInRowColumn = function(el1, el2, axis) {
+			var dragEl = dnd.dragEl;
+
+			var el1Rect = geom.boundingRect(el1),//el1 === dragEl && realDragElRect || geom.boundingRect(el1),
+				el2Rect = geom.boundingRect(el2),//el2 === dragEl && realDragElRect || geom.boundingRect(el2),
+				el1S1Opp = axis === 'vertical' ? el1Rect.left : el1Rect.top,
+				el1S2Opp = axis === 'vertical' ? el1Rect.right : el1Rect.bottom,
+				el1OppLength = axis === 'vertical' ? el1Rect.width : el1Rect.height,
+				el2S1Opp = axis === 'vertical' ? el2Rect.left : el2Rect.top,
+				el2S2Opp = axis === 'vertical' ? el2Rect.right : el2Rect.bottom,
+				el2OppLength = axis === 'vertical' ? el2Rect.width : el2Rect.height;
+
+			return (
+				el1S1Opp === el2S1Opp ||
+				el1S2Opp === el2S2Opp ||
+				(el1S1Opp + el1OppLength / 2) === (el2S1Opp + el2OppLength / 2)
+			);
+		};
+
+
+	return {
+		_index,
+		_isElInRowColumn,
+		_isClientInRowColumn
+	}
+	
+});
+define('skylark-sortable/Sortable',[
+	"skylark-langx/skylark",
+	"skylark-langx/langx",
+	"skylark-langx-hoster/isBrowser",
+	"skylark-langx-hoster/isMobile",
+	"skylark-domx-query",
+	"skylark-domx-browser",
+	"skylark-domx-noder",
+	"skylark-domx-finder",
+	"skylark-domx-geom",
+	"skylark-domx-styler",
+	"skylark-domx-eventer",
+	"skylark-domx-transforms",
+	"skylark-domx-scrolls/scrollingElement",
+	"skylark-domx-layouts/oriented",
+	"skylark-devices-points/touch",
+	"./autoscroll",
+	"./containers",
+	"./dnd"
+],function(
+	skylark,
+	langx,
+	isBrowser,
+	isMobile,
+	$,
+	browser,
+	noder,
+	finder,
+	geom,
+	styler,
+	eventer,
+	transforms,
+	scrollingElement,
+	oriented,
+	touch,
+	autoscroll,
+	containers,
+	dnd
 ){
 	function log(category,message) {
 		$("#console").append("<div>"+category+":"+message+"</div>");	
 	}	
 
 
-	var dragEl,
+	var 
 		parentEl,
-		ghostEl,
-		cloneEl,
+		//ghostEl,
+		//cloneEl,
 		rootEl,
 		nextEl,
 		lastDownEl,
 
 		scrollEl,
-		scrollParentEl,
+		//scrollParentEl,
 		scrollCustomFn,
 
 		oldIndex,
@@ -696,18 +1027,18 @@ define('skylark-sortable/Sortable',[
 		newDraggableIndex,
 
 		activeGroup,
-		putSortable,
+		//putSortable,
 
 		awaitingDragStarted = false,
 		ignoreNextClick = false,
-		sortables = [],
+		//sortables = [],
 
 		pointerElemChangedInterval,
 		lastPointerElemX,
 		lastPointerElemY,
 
 		tapEvt,
-		touchEvt,
+		//touchEvt,
 
 		moved,
 
@@ -728,8 +1059,6 @@ define('skylark-sortable/Sortable',[
 
 		/** @const */
 		R_SPACE = /\s+/g,
-
-		expando = 'Sortable' + (new Date).getTime(),
 
 		win = window,
 		document = win.document,
@@ -786,61 +1115,6 @@ define('skylark-sortable/Sortable',[
 
 		savedInputChecked = [],
 
-		/**
-		 * Detects children direction.
-		 */
-		_detectDirection = function(el, options) {
-			options.excluding = [ghostEl,dragEl];
-			return oriented(el,options);
-		},
-
-		/**
-		 * Detects first nearest empty sortable to X and Y position using emptyInsertThreshold.
-		 * @param  {Number} x      X position
-		 * @param  {Number} y      Y position
-		 * @return {HTMLElement}   Element of the first found nearest Sortable
-		 */
-		_detectNearestEmptySortable = function(x, y) {
-			for (var i = 0; i < sortables.length; i++) {
-				if (_lastChild(sortables[i])) continue;
-
-				var rect = geom.boundingRect(sortables[i]),
-					threshold = sortables[i][expando].options.emptyInsertThreshold,
-					insideHorizontally = x >= (rect.left - threshold) && x <= (rect.right + threshold),
-					insideVertically = y >= (rect.top - threshold) && y <= (rect.bottom + threshold);
-
-				if (threshold && insideHorizontally && insideVertically) {
-					return sortables[i];
-				}
-			}
-		},
-
-		_isClientInRowColumn = function(x, y, el, axis, options) {
-			var targetRect = geom.boundingRect(el),
-				targetS1Opp = axis === 'vertical' ? targetRect.left : targetRect.top,
-				targetS2Opp = axis === 'vertical' ? targetRect.right : targetRect.bottom,
-				mouseOnOppAxis = axis === 'vertical' ? x : y;
-
-			return targetS1Opp < mouseOnOppAxis && mouseOnOppAxis < targetS2Opp;
-		},
-
-		_isElInRowColumn = function(el1, el2, axis) {
-			var el1Rect = el1 === dragEl && realDragElRect || geom.boundingRect(el1),
-				el2Rect = el2 === dragEl && realDragElRect || geom.boundingRect(el2),
-				el1S1Opp = axis === 'vertical' ? el1Rect.left : el1Rect.top,
-				el1S2Opp = axis === 'vertical' ? el1Rect.right : el1Rect.bottom,
-				el1OppLength = axis === 'vertical' ? el1Rect.width : el1Rect.height,
-				el2S1Opp = axis === 'vertical' ? el2Rect.left : el2Rect.top,
-				el2S2Opp = axis === 'vertical' ? el2Rect.right : el2Rect.bottom,
-				el2OppLength = axis === 'vertical' ? el2Rect.width : el2Rect.height;
-
-			return (
-				el1S1Opp === el2S1Opp ||
-				el1S2Opp === el2S2Opp ||
-				(el1S1Opp + el1OppLength / 2) === (el2S1Opp + el2OppLength / 2)
-			);
-		},
-
 
 		_prepareGroup = function (options) {
 			function toFn(value, pull) {
@@ -884,22 +1158,18 @@ define('skylark-sortable/Sortable',[
 			options.group = group;
 		},
 
-		_checkAlignment = function(evt) {
-			if (!dragEl || !dragEl.parentNode) return;
-			dragEl.parentNode[expando] && dragEl.parentNode[expando]._computeIsAligned(evt);
-		},
 
-		_hideGhostForTarget = function() {
-			if (!supportCssPointerEvents && ghostEl) {
-				styler.css(ghostEl, 'display', 'none');
-			}
-		},
+		//_hideGhostForTarget = function() {
+		//	if (!supportCssPointerEvents && ghostEl) {
+		//		styler.css(ghostEl, 'display', 'none');
+		//	}
+		//},
 
-		_unhideGhostForTarget = function() {
-			if (!supportCssPointerEvents && ghostEl) {
-				styler.css(ghostEl, 'display', '');
-			}
-		};
+		//_unhideGhostForTarget = function() {
+		//	if (!supportCssPointerEvents && ghostEl) {
+		//		styler.css(ghostEl, 'display', '');
+		//	}
+		//};
 
 
 
@@ -913,25 +1183,6 @@ define('skylark-sortable/Sortable',[
 			return false;
 		}
 	}, true);
-
-	var nearestEmptyInsertDetectEvent = function(evt) {
-		if (dragEl) {
-			evt = evt.touches ? evt.touches[0] : evt;
-			var nearest = _detectNearestEmptySortable(evt.clientX, evt.clientY);
-
-			if (nearest) {
-				// Create imitation event
-				var event = {};
-				for (var i in evt) {
-					event[i] = evt[i];
-				}
-				event.target = event.rootEl = nearest;
-				event.preventDefault = void 0;
-				event.stopPropagation = void 0;
-				nearest[expando]._onDragOver(event);
-			}
-		}
-	};
 
 
 	function _find(ctx, tagName, iterator) {
@@ -967,7 +1218,7 @@ define('skylark-sortable/Sortable',[
 		*/
 		return finder.lastChild(el,{
 			ignoreHidden : true,
-			excluding : [ghostEl]
+			excluding : [dnd.ghostEl]
 		})
 	}
 
@@ -1005,23 +1256,6 @@ define('skylark-sortable/Sortable',[
 		}
 
 		return sum.toString(36);
-	}
-
-	/**
-	 * Returns the index of an element within its parent for a selected set of
-	 * elements
-	 * @param  {HTMLElement} el
-	 * @param  {selector} selector
-	 * @return {number}
-	 */
-	function _index(el, selector) {
-		return finder.index(el,function(el){
-			if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== cloneEl && (!selector || finder.matches(el, selector))) {
-				return true;
-			}
-
-			return false;			
-		})
 	}
 
 
@@ -1119,7 +1353,7 @@ define('skylark-sortable/Sortable',[
 
 
 		// Export instance
-		el[expando] = this;
+		el[dnd.expando] = this;
 
 		// Default options
 		var defaults = {
@@ -1137,8 +1371,10 @@ define('skylark-sortable/Sortable',[
 			invertSwap: false, // invert always
 			invertedSwapThreshold: null, // will be set to same as swapThreshold if default
 			removeCloneOnHide: true,
-			direction: function() {
-				return _detectDirection(el, this.options);
+			direction: function(evt, target, dragEl,ghostEl) {
+				return oriented(el, langx.mixin({
+									excluding : [ghostEl,dragEl]
+								},this.options));
 			},
 			ghostClass: 'sortable-ghost',
 			chosenClass: 'sortable-chosen',
@@ -1199,7 +1435,7 @@ define('skylark-sortable/Sortable',[
 			eventer.on(el, 'dragenter', this);
 		}
 
-		sortables.push(this.el);
+		dnd.sortables.push(this.el);
 
 		// Restore sorting
 		options.store && options.store.get && this.sort(options.store.get(this) || []);
@@ -1209,15 +1445,16 @@ define('skylark-sortable/Sortable',[
 		constructor: Sortable,
 
 		_computeIsAligned: function(evt) {
-			var target;
+			var target,
+				dragEl = dnd.dragEl;
 
-			if (ghostEl && !supportCssPointerEvents) {
-				_hideGhostForTarget();
-				target = document.elementFromPoint(evt.clientX, evt.clientY);
-				_unhideGhostForTarget();
-			} else {
+			//if (ghostEl && !supportCssPointerEvents) {
+			//	_hideGhostForTarget();
+			//	target = document.elementFromPoint(evt.clientX, evt.clientY);
+			//	_unhideGhostForTarget();
+			//} else {
 				target = evt.target;
-			}
+			//}
 
 			target = finder.closest(target, this.options.draggable, this.el, false);
 			if (_alignedSilent) return;
@@ -1227,7 +1464,7 @@ define('skylark-sortable/Sortable',[
 			for (var i = 0; i < children.length; i++) {
 				// Don't change for target in case it is changed to aligned before onDragOver is fired
 				if (finder.closest(children[i], this.options.draggable, this.el, false) && children[i] !== target) {
-					children[i].sortableMouseAligned = _isClientInRowColumn(evt.clientX, evt.clientY, children[i], this._getDirection(evt, null), this.options);
+					children[i].sortableMouseAligned = containers._isClientInRowColumn(evt.clientX, evt.clientY, children[i], this._getDirection(evt, null), this.options);
 				}
 			}
 			// Used for nulling last target when not in element, nothing to do with checking if aligned
@@ -1243,7 +1480,9 @@ define('skylark-sortable/Sortable',[
 		},
 
 		_getDirection: function(evt, target) {
-			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl) : this.options.direction;
+			var  dragEl = dnd.dragEl;
+
+			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,dnd.ghostEl) : this.options.direction;
 		},
 
 
@@ -1265,7 +1504,7 @@ define('skylark-sortable/Sortable',[
 			_saveInputCheckedState(el);
 
 			// Don't trigger start event when an element is been dragged, otherwise the evt.oldindex always wrong when set option.group.
-			if (dragEl) {
+			if (dnd.dragEl) {
 				return;
 			}
 
@@ -1289,13 +1528,13 @@ define('skylark-sortable/Sortable',[
 			log("_onTapStart",target.tagName+","+target.className);
 
 			// Get the index of the dragged element within its parent
-			startIndex = _index(target);
-			startDraggableIndex = _index(target, options.draggable);
+			startIndex = containers._index(target);
+			startDraggableIndex = containers._index(target, options.draggable);
 
 			// Check filter
 			if (typeof filter === 'function') {
 				if (filter.call(this, evt, target, this)) {
-					_dispatchEvent(_this, originalTarget, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
+					dnd._dispatchEvent(_this, originalTarget, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
 					preventOnFilter && evt.cancelable && evt.preventDefault();
 					return; // cancel dnd
 				}
@@ -1305,7 +1544,7 @@ define('skylark-sortable/Sortable',[
 					criteria = finder.closest(originalTarget, criteria.trim(), el, false);
 
 					if (criteria) {
-						_dispatchEvent(_this, criteria, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
+						dnd._dispatchEvent(_this, criteria, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
 						return true;
 					}
 				});
@@ -1327,7 +1566,7 @@ define('skylark-sortable/Sortable',[
 
 		_handleAutoScroll: function(evt, fallback) {
 
-			if (!dragEl || !this.options.scroll) return;
+			if (!dnd.dragEl || !this.options.scroll) return;
 
 			return autoscroll._handleAutoScroll(evt,this.options,fallback);
 		},
@@ -1337,11 +1576,12 @@ define('skylark-sortable/Sortable',[
 				el = _this.el,
 				options = _this.options,
 				ownerDocument = el.ownerDocument,
-				dragStartFn;
+				dragStartFn,
+				dragEl = dnd.dragEl;
 			log("_prepareDragStart","start");
 			if (target && !dragEl && (target.parentNode === el)) {
 				rootEl = el;
-				dragEl = target;
+				dragEl = dnd.dragEl = target;
 				parentEl = dragEl.parentNode;
 				nextEl = dragEl.nextSibling;
 				lastDownEl = target;
@@ -1376,7 +1616,7 @@ define('skylark-sortable/Sortable',[
 					_this._triggerDragStart(evt, touch);
 
 					// Drag start event
-					_dispatchEvent(_this, rootEl, 'choose', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex);
+					dnd._dispatchEvent(_this, rootEl, 'choose', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex);
 
 					// Chosen item
 					styler.toggleClass(dragEl, options.chosenClass, true);
@@ -1387,9 +1627,7 @@ define('skylark-sortable/Sortable',[
 					_find(dragEl, criteria.trim(), _disableDraggable);
 				});
 
-				eventer.on(ownerDocument, 'dragover', nearestEmptyInsertDetectEvent);
-				eventer.on(ownerDocument, 'mousemove', nearestEmptyInsertDetectEvent);
-				///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
+				dnd.prepare(this);
 
 				eventer.on(ownerDocument, 'mouseup', _this._onDrop);
 				///eventer.on(ownerDocument, 'touchend', _this._onDrop);
@@ -1430,7 +1668,7 @@ define('skylark-sortable/Sortable',[
 		},
 
 		_disableDelayedDrag: function () {
-			dragEl && _disableDraggable(dragEl);
+			dnd.dragEl && _disableDraggable(dnd.dragEl);
 			clearTimeout(this._dragStartTimer);
 
 			this._disableDelayedDragEvents();
@@ -1450,7 +1688,7 @@ define('skylark-sortable/Sortable',[
 			if (!this.nativeDraggable) {
 				eventer.on(document, 'mousemove', this._onTouchMove);
 			} else {
-				eventer.on(dragEl, 'dragend', this);
+				eventer.on(dnd.dragEl, 'dragend', this);
 				eventer.on(rootEl, 'dragstart', this._onDragStart);
 			}
 
@@ -1471,10 +1709,12 @@ define('skylark-sortable/Sortable',[
 		//
 		_dragStarted: function (fallback, evt) {
 			awaitingDragStarted = false;
+			var dragEl = dnd.dragEl;
+
 			if (rootEl && dragEl) {
 				if (this.nativeDraggable) {
 					eventer.on(document, 'dragover', this._handleAutoScroll);
-					eventer.on(document, 'dragover', _checkAlignment);
+					eventer.on(document, 'dragover', dnd._checkAlignment);
 				}
 				var options = this.options;
 
@@ -1485,67 +1725,21 @@ define('skylark-sortable/Sortable',[
 				// In case dragging an animated element
 				styler.css(dragEl, 'transform', '');
 
-				Sortable.active = this;
+				dnd.active = this;
 
 				fallback && this._appendGhost();
 
 				// Drag start event
-				_dispatchEvent(this, rootEl, 'start', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex, undefined, evt);
+				dnd._dispatchEvent(this, rootEl, 'start', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex, undefined, evt);
 			} else {
 				this._nulling();
-			}
-		},
-
-		_emulateDragOver: function (forAutoScroll) {
-			if (touchEvt) {
-				if (this._lastX === touchEvt.clientX && this._lastY === touchEvt.clientY && !forAutoScroll) {
-					return;
-				}
-				this._lastX = touchEvt.clientX;
-				this._lastY = touchEvt.clientY;
-
-				_hideGhostForTarget();
-
-				var target = document.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
-				var parent = target;
-
-				while (target && target.shadowRoot) {
-					target = target.shadowRoot.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
-					if (target === parent) break;
-					parent = target;
-				}
-
-				if (parent) {
-					do {
-						if (parent[expando]) {
-							var inserted;
-
-							inserted = parent[expando]._onDragOver({
-								clientX: touchEvt.clientX,
-								clientY: touchEvt.clientY,
-								target: target,
-								rootEl: parent
-							});
-
-							if (inserted && !this.options.dragoverBubble) {
-								break;
-							}
-						}
-
-						target = parent; // store last element
-					}
-					/* jshint boss:true */
-					while (parent = parent.parentNode);
-				}
-				dragEl.parentNode[expando]._computeIsAligned(touchEvt);
-
-				_unhideGhostForTarget();
 			}
 		},
 
 
 		_onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
 			log("_onTouchMove","start");
+			var ghostEl = dnd.ghostEl;
 			if (tapEvt) {
 				var	options = this.options,
 					fallbackTolerance = options.fallbackTolerance,
@@ -1554,7 +1748,7 @@ define('skylark-sortable/Sortable',[
 					matrix = ghostEl && transforms.matrix(ghostEl),
 					scaleX = ghostEl && matrix && matrix.a,
 					scaleY = ghostEl && matrix && matrix.d,
-					relativeScrollOffset = PositionGhostAbsolutely && ghostRelativeParent && _getRelativeScrollOffset(ghostRelativeParent),
+					relativeScrollOffset = PositionGhostAbsolutely && ghostRelativeParent && autoscroll._getRelativeScrollOffset(ghostRelativeParent),
 					dx = ((touch.clientX - tapEvt.clientX)
 							+ fallbackOffset.x) / (scaleX || 1)
 							+ (relativeScrollOffset ? (relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0]) : 0) / (scaleX || 1),
@@ -1564,7 +1758,7 @@ define('skylark-sortable/Sortable',[
 					translate3d = evt.touches ? 'translate3d(' + dx + 'px,' + dy + 'px,0)' : 'translate(' + dx + 'px,' + dy + 'px)';
 
 				// only set the status to dragging, when we are actually dragging
-				if (!Sortable.active && !awaitingDragStarted) {
+				if (!dnd.active && !awaitingDragStarted) {
 					if (fallbackTolerance &&
 						min(abs(touch.clientX - this._lastX), abs(touch.clientY - this._lastY)) < fallbackTolerance
 					) {
@@ -1576,7 +1770,7 @@ define('skylark-sortable/Sortable',[
 				!forAutoScroll && this._handleAutoScroll(touch, true);
 
 				moved = true;
-				touchEvt = touch;
+				dnd.touchEvt = touch;
 
 				if (ghostEl) {
 					styler.css(ghostEl, 'webkitTransform', translate3d);
@@ -1594,6 +1788,9 @@ define('skylark-sortable/Sortable',[
 		_appendGhost: function () {
 			// Bug if using scale(): https://stackoverflow.com/questions/2637058
 			// Not being adjusted for
+			var  dragEl = dnd.dragEl,
+				ghostEl = dnd.ghostEl;
+
 			if (!ghostEl) {
 				var container = this.options.fallbackOnBody ? document.body : rootEl,
 					rect = _getRect(dragEl, true, container, !PositionGhostAbsolutely),
@@ -1628,11 +1825,11 @@ define('skylark-sortable/Sortable',[
 					} else {
 						ghostRelativeParent = scrollingElement();
 					}
-					ghostRelativeParentInitialScroll = _getRelativeScrollOffset(ghostRelativeParent);
+					ghostRelativeParentInitialScroll = autoscroll._getRelativeScrollOffset(ghostRelativeParent);
 				}
 
 
-				ghostEl = dragEl.cloneNode(true);
+				ghostEl =dnd.ghostEl = dragEl.cloneNode(true);
 
 				styler.toggleClass(ghostEl, options.ghostClass, false);
 				styler.toggleClass(ghostEl, options.fallbackClass, true);
@@ -1655,7 +1852,8 @@ define('skylark-sortable/Sortable',[
 
 
 		_animate: function (prevRect, target) {
-			var ms = this.options.animation;
+			var ms = this.options.animation,
+				dragEl = dnd.dragEl;
 
 			if (ms) {
 				var currentRect = geom.boundingRect(target);
@@ -1701,8 +1899,8 @@ define('skylark-sortable/Sortable',[
 		},
 
 		_offMoveEvents: function() {
-			eventer.off(document, 'dragover', nearestEmptyInsertDetectEvent);
-			eventer.off(document, 'mousemove', nearestEmptyInsertDetectEvent);
+			eventer.off(document, 'dragover', dnd.nearestEmptyInsertDetectEvent);
+			eventer.off(document, 'mousemove', dnd.nearestEmptyInsertDetectEvent);
 		},
 
 		_offUpEvents: function () {
@@ -1713,12 +1911,14 @@ define('skylark-sortable/Sortable',[
 		},
 
 		_onDragStart: function (/**Event*/evt, /**boolean*/fallback) {
-			var _this = this;
+			var _this = this,
+				dragEl = dnd.dragEl;
+
 			var dataTransfer = evt.dataTransfer;
 			var options = _this.options;
 
 			// Setup clone
-			cloneEl = noder.clone(dragEl,true);
+			var cloneEl = dnd.cloneEl = noder.clone(dragEl,true);
 
 			cloneEl.draggable = false;
 			cloneEl.style['will-change'] = '';
@@ -1733,7 +1933,7 @@ define('skylark-sortable/Sortable',[
 				if (!_this.options.removeCloneOnHide) {
 					rootEl.insertBefore(cloneEl, dragEl);
 				}
-				_dispatchEvent(_this, rootEl, 'clone', dragEl);
+				dnd._dispatchEvent(_this, rootEl, 'clone', dragEl);
 			});
 
 
@@ -1742,7 +1942,7 @@ define('skylark-sortable/Sortable',[
 			// Set proper drop events
 			if (fallback) {
 				ignoreNextClick = true;
-				_this._loopId = setInterval(_this._emulateDragOver, 50);
+				_this._loopId = setInterval(dnd._emulateDragOver.bind(dnd), 50);
 			} else {
 				// Undo what was set in _prepareDragStart before drag started
 				eventer.off(document, 'mouseup', _this._onDrop);
@@ -1779,10 +1979,12 @@ define('skylark-sortable/Sortable',[
 				revert,
 				options = this.options,
 				group = options.group,
-				activeSortable = Sortable.active,
+				activeSortable = dnd.active,
 				isOwner = (activeGroup === group),
 				canSort = options.sort,
-				_this = this;
+				_this = this,
+				dragEl = dnd.dragEl,
+				putSortable = dnd.putSortable;
 
 			if (_silent) return;
 
@@ -1801,10 +2003,10 @@ define('skylark-sortable/Sortable',[
 						styler.toggleClass(dragEl, options.ghostClass, true);
 					}
 
-					if (putSortable !== _this && _this !== Sortable.active) {
-						putSortable = _this;
-					} else if (_this === Sortable.active) {
-						putSortable = null;
+					if (putSortable !== _this && _this !== dnd.active) {
+						putSortable = dnd.putSortable = _this;
+					} else if (_this === dnd.active) {
+						putSortable = dnd.putSortable =  null;
 					}
 
 					// Animation
@@ -1821,10 +2023,10 @@ define('skylark-sortable/Sortable',[
 				// no bubbling and not fallback
 				if (!options.dragoverBubble && !evt.rootEl && target !== document) {
 					_this._handleAutoScroll(evt);
-					dragEl.parentNode[expando]._computeIsAligned(evt);
+					dragEl.parentNode[dnd.expando]._computeIsAligned(evt);
 
 					// Do not detect for empty insert if already inserted
-					!insertion && nearestEmptyInsertDetectEvent(evt);
+					!insertion && dnd.nearestEmptyInsertDetectEvent(evt);
 				}
 
 				!options.dragoverBubble && evt.stopPropagation && evt.stopPropagation();
@@ -1834,7 +2036,7 @@ define('skylark-sortable/Sortable',[
 
 			// Call when dragEl has been inserted
 			function changed() {
-				_dispatchEvent(_this, rootEl, 'change', target, el, rootEl, oldIndex, _index(dragEl), oldDraggableIndex, _index(dragEl, options.draggable), evt);
+				dnd._dispatchEvent(_this, rootEl, 'change', target, el, rootEl, oldIndex, containers._index(dragEl), oldDraggableIndex, containers._index(dragEl, options.draggable), evt);
 			}
 
 
@@ -1845,8 +2047,8 @@ define('skylark-sortable/Sortable',[
 			 * @return {Number}                   Direction dragEl must be swapped
 			 */
 			function _getInsertDirection(target) {
-				var dragElIndex = _index(dragEl),
-					targetIndex = _index(target);
+				var dragElIndex = containers._index(dragEl),
+					targetIndex = containers._index(target);
 
 				if (dragElIndex < targetIndex) {
 					return 1;
@@ -1996,7 +2198,7 @@ define('skylark-sortable/Sortable',[
 						activeSortable._showClone(this);
 					}
 
-					if (_onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, !!target) !== false) {
+					if (dnd._onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, !!target) !== false) {
 						el.appendChild(dragEl);
 						parentEl = el; // actualization
 						realDragElRect = null;
@@ -2023,7 +2225,7 @@ define('skylark-sortable/Sortable',[
 
 					// Reference: https://www.lucidchart.com/documents/view/10fa0e93-e362-4126-aca2-b709ee56bd8b/0
 					if (
-						_isElInRowColumn(dragEl, target, axis) && aligned ||
+						containers._isElInRowColumn(dragEl, target, axis) && aligned ||
 						differentLevel ||
 						scrolledPastTop ||
 						options.invertSwap ||
@@ -2061,7 +2263,7 @@ define('skylark-sortable/Sortable',[
 
 					after = direction === 1;
 
-					var moveVector = _onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, after);
+					var moveVector = dnd._onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, after);
 
 					if (moveVector !== false) {
 						if (moveVector === 1 || moveVector === -1) {
@@ -2110,7 +2312,10 @@ define('skylark-sortable/Sortable',[
 
 		_onDrop: function (/**Event*/evt) {
 			var el = this.el,
-				options = this.options;
+				options = this.options,
+				dragEl = dnd.dragEl,
+				putSortable = dnd.putSortable;
+
 			awaitingDragStarted = false;
 			scrolling = false;
 			isCircumstantialInvert = false;
@@ -2136,7 +2341,7 @@ define('skylark-sortable/Sortable',[
 				eventer.off(document, 'drop', this);
 				eventer.off(el, 'dragstart', this._onDragStart);
 				eventer.off(document, 'dragover', this._handleAutoScroll);
-				eventer.off(document, 'dragover', _checkAlignment);
+				eventer.off(document, 'dragover', dnd._checkAlignment);
 			}
 
 			if (Safari) {
@@ -2152,11 +2357,11 @@ define('skylark-sortable/Sortable',[
 					!options.dropBubble && evt.stopPropagation();
 				}
 
-				ghostEl && ghostEl.parentNode && ghostEl.parentNode.removeChild(ghostEl);
+				dnd.ghostEl && dnd.ghostEl.parentNode && dnd.ghostEl.parentNode.removeChild(dnd.ghostEl);
 
 				if (rootEl === parentEl || (putSortable && putSortable.lastPutMode !== 'clone')) {
 					// Remove clone
-					cloneEl && cloneEl.parentNode && cloneEl.parentNode.removeChild(cloneEl);
+					dnd.cloneEl && dnd.cloneEl.parentNode && dnd.cloneEl.parentNode.removeChild(dnd.cloneEl);
 				}
 
 				if (dragEl) {
@@ -2172,22 +2377,22 @@ define('skylark-sortable/Sortable',[
 					styler.toggleClass(dragEl, this.options.chosenClass, false);
 
 					// Drag stop event
-					_dispatchEvent(this, rootEl, 'unchoose', dragEl, parentEl, rootEl, oldIndex, null, oldDraggableIndex, null, evt);
+					dnd._dispatchEvent(this, rootEl, 'unchoose', dragEl, parentEl, rootEl, oldIndex, null, oldDraggableIndex, null, evt);
 
 					if (rootEl !== parentEl) {
-						newIndex = _index(dragEl);
-						newDraggableIndex = _index(dragEl, options.draggable);
+						newIndex = containers._index(dragEl);
+						newDraggableIndex = containers._index(dragEl, options.draggable);
 
 						if (newIndex >= 0) {
 							// Add event
-							_dispatchEvent(null, parentEl, 'add', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
+							dnd._dispatchEvent(null, parentEl, 'add', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
 
 							// Remove event
-							_dispatchEvent(this, rootEl, 'remove', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
+							dnd._dispatchEvent(this, rootEl, 'remove', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
 
 							// drag from one list and drop into another
-							_dispatchEvent(null, parentEl, 'sort', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
-							_dispatchEvent(this, rootEl, 'sort', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
+							dnd._dispatchEvent(null, parentEl, 'sort', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
+							dnd._dispatchEvent(this, rootEl, 'sort', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
 						}
 
 						putSortable && putSortable.save();
@@ -2195,24 +2400,24 @@ define('skylark-sortable/Sortable',[
 					else {
 						if (dragEl.nextSibling !== nextEl) {
 							// Get the index of the dragged element within its parent
-							newIndex = _index(dragEl);
-							newDraggableIndex = _index(dragEl, options.draggable);
+							newIndex = containers._index(dragEl);
+							newDraggableIndex = containers._index(dragEl, options.draggable);
 
 							if (newIndex >= 0) {
 								// drag & drop within the same list
-								_dispatchEvent(this, rootEl, 'update', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
-								_dispatchEvent(this, rootEl, 'sort', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
+								dnd._dispatchEvent(this, rootEl, 'update', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
+								dnd._dispatchEvent(this, rootEl, 'sort', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
 							}
 						}
 					}
 
-					if (Sortable.active) {
+					if (dnd.active) {
 						/* jshint eqnull:true */
 						if (newIndex == null || newIndex === -1) {
 							newIndex = oldIndex;
 							newDraggableIndex = oldDraggableIndex;
 						}
-						_dispatchEvent(this, rootEl, 'end', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
+						dnd._dispatchEvent(this, rootEl, 'end', dragEl, parentEl, rootEl, oldIndex, newIndex, oldDraggableIndex, newDraggableIndex, evt);
 
 						// Save sorting
 						this.save();
@@ -2225,15 +2430,15 @@ define('skylark-sortable/Sortable',[
 
 		_nulling: function() {
 			rootEl =
-			dragEl =
+			dnd.dragEl =
 			parentEl =
-			ghostEl =
+			dnd.ghostEl =
 			nextEl =
-			cloneEl =
+			dnd.cloneEl =
 			lastDownEl =
 
 			scrollEl =
-			scrollParentEl =
+			autoscroll.scrollParentEl =
 			autoscroll.autoScrolls.length =
 
 			pointerElemChangedInterval =
@@ -2241,7 +2446,7 @@ define('skylark-sortable/Sortable',[
 			lastPointerElemY =
 
 			tapEvt =
-			touchEvt =
+			dnd.touchEvt =
 
 			moved =
 			newIndex =
@@ -2252,9 +2457,9 @@ define('skylark-sortable/Sortable',[
 
 			realDragElRect =
 
-			putSortable =
+			dnd.putSortable =
 			activeGroup =
-			Sortable.active = null;
+			dnd.active = null;
 
 			savedInputChecked.forEach(function (el) {
 				el.checked = true;
@@ -2272,7 +2477,7 @@ define('skylark-sortable/Sortable',[
 
 				case 'dragenter':
 				case 'dragover':
-					if (dragEl) {
+					if (dnd.dragEl) {
 						this._onDragOver(evt);
 						_globalDragOver(evt);
 					}
@@ -2379,7 +2584,7 @@ define('skylark-sortable/Sortable',[
 		destroy: function () {
 			var el = this.el;
 
-			el[expando] = null;
+			el[dnd.expando] = null;
 
 			eventer.off(el, 'mousedown', this._onTapStart);
 
@@ -2395,42 +2600,43 @@ define('skylark-sortable/Sortable',[
 
 			this._onDrop();
 
-			sortables.splice(sortables.indexOf(this.el), 1);
+			dnd.sortables.splice(dnd.sortables.indexOf(this.el), 1);
 
 			this.el = el = null;
 		},
 
 		_hideClone: function() {
-			if (!cloneEl.cloneHidden) {
-				styler.css(cloneEl, 'display', 'none');
-				cloneEl.cloneHidden = true;
-				if (cloneEl.parentNode && this.options.removeCloneOnHide) {
-					cloneEl.parentNode.removeChild(cloneEl);
+			if (!dnd.cloneEl.cloneHidden) {
+				styler.css(dnd.cloneEl, 'display', 'none');
+				dnd.cloneEl.cloneHidden = true;
+				if (dnd.cloneEl.parentNode && this.options.removeCloneOnHide) {
+					dnd.cloneEl.parentNode.removeChild(dnd.cloneEl);
 				}
 			}
 		},
 
 		_showClone: function(putSortable) {
+
 			if (putSortable.lastPutMode !== 'clone') {
 				this._hideClone();
 				return;
 			}
 
-			if (cloneEl.cloneHidden) {
+			if (dnd.cloneEl.cloneHidden) {
 				// show clone at dragEl or original position
-				if (rootEl.contains(dragEl) && !this.options.group.revertClone) {
-					rootEl.insertBefore(cloneEl, dragEl);
+				if (rootEl.contains(dnd.dragEl) && !this.options.group.revertClone) {
+					rootEl.insertBefore(dnd.cloneEl, dnd.dragEl);
 				} else if (nextEl) {
-					rootEl.insertBefore(cloneEl, nextEl);
+					rootEl.insertBefore(dnd.cloneEl, nextEl);
 				} else {
-					rootEl.appendChild(cloneEl);
+					rootEl.appendChild(dnd.cloneEl);
 				}
 
 				if (this.options.group.revertClone) {
-					this._animate(dragEl, cloneEl);
+					this._animate(dnd.dragEl, dnd.cloneEl);
 				}
-				styler.css(cloneEl, 'display', '');
-				cloneEl.cloneHidden = false;
+				styler.css(dnd.cloneEl, 'display', '');
+				dnd.cloneEl.cloneHidden = false;
 			}
 		}
 	};
@@ -2441,66 +2647,6 @@ define('skylark-sortable/Sortable',[
 			evt.dataTransfer.dropEffect = 'move';
 		}
 		evt.cancelable && evt.preventDefault();
-	}
-
-	function _dispatchEvent(
-		sortable, rootEl, name,
-		targetEl, toEl, fromEl,
-		startIndex, newIndex,
-		startDraggableIndex, newDraggableIndex,
-		originalEvt
-	) {
-		sortable = (sortable || rootEl[expando]);
-		var evt,
-			options = sortable.options,
-			onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1);
-
-		evt = eventer.create(name,{
-			to : toEl || rootEl,
-			from : fromEl || rootEl,
-			item : targetEl || rootEl,
-			clone : cloneEl,
-			oldIndex : startIndex,
-			newIndex : newIndex,
-			oldDraggableIndex : startDraggableIndex,
-			newDraggableIndex : newDraggableIndex,
-			originalEvent : originalEvt,
-			pullMode : putSortable ? putSortable.lastPutMode : undefined
-		});
-		if (rootEl) {
-			rootEl.dispatchEvent(evt);
-		}
-
-		if (options[onName]) {
-			options[onName].call(sortable, evt);
-		}
-	}
-
-
-	function _onMove(fromEl, toEl, dragEl, dragRect, targetEl, targetRect, originalEvt, willInsertAfter) {
-		var evt,
-			sortable = fromEl[expando],
-			onMoveFn = sortable.options.onMove,
-			retVal;
-
-		evt = eventer.create("move",{
-			to : toEl,
-			from : fromEl,
-			dragged : dragEl,
-			draggedRect: dragRect,
-			related : targetEl || toEl,
-			relatedRect : targetRect || geom.boundingRect(toEl),
-			willInsertAfter : willInsertAfter,
-			originalEvent : originalEvt
-		});
-
-		fromEl.dispatchEvent(evt);
-
-		if (onMoveFn) {
-			retVal = onMoveFn.call(sortable, evt, originalEvt);
-		}
-
-		return retVal;
 	}
 
 	function _disableDraggable(el) {
@@ -2528,10 +2674,10 @@ define('skylark-sortable/Sortable',[
 		clone: 	function (el) {
 					return noder.clone(el,true);
 				},
-		index: _index,
+		index: containers._index,
 		nextTick: _nextTick,
 		cancelNextTick: _cancelNextTick,
-		detectDirection: _detectDirection,
+		//detectDirection: _detectDirection,
 		getChild: function(el, childNum, options) {
 			options.excluding = [];
 			options.closesting = options.draggable;

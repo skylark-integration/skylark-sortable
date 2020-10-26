@@ -8,13 +8,12 @@ define([
     "skylark-domx-styler",
     "skylark-domx-plugins"
 ], function(langx, noder, datax, finder, geom, eventer, styler, plugins) {
-    var Draggable = plugins.Plugin.inherit({
-        klassName: "Draggable",
+    var Droppable = plugins.Plugin.inherit({
+        klassName: "Droppable",
         
-        pluginName : "intg.sortable.draggable",
+        pluginName : "intg.sortable.droppable",
 
         options : {
-            draggingClass : "dragging"
         },
 
         _construct: function(elm, options) {
@@ -23,6 +22,6 @@ define([
     });
 
 
-    return Draggable;
+    return Droppable;
 
 });
