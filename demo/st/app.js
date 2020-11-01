@@ -16,7 +16,7 @@ function initPage($,Sortable) {
 	// Example 1 - Simple list
 	new Sortable(example1, {
 		animation: 150,
-		forceFallback : true,
+		//forceFallback : true,
 		ghostClass: 'blue-background-class'
 	});
 
@@ -149,7 +149,7 @@ function initPage($,Sortable) {
 		}
 
 		for (i = 0; i < example7InvertedSwapThresholdIndicators.length; i++) {
-			/* jshint expr:true */
+			//jshint expr:true 
 			evt.target.value === 'h' && (example7InvertedSwapThresholdIndicators[i].style.height = '100%');
 			evt.target.value === 'v' && (example7InvertedSwapThresholdIndicators[i].style.width = '100%');
 		}
@@ -204,5 +204,6 @@ function initPage($,Sortable) {
 			animation: 150
 		});
 	}
+
 
 }

@@ -262,318 +262,27 @@ define('skylark-langx-hoster/isBrowser',[
     return hoster.isBrowser;
 });
 
-define('skylark-domx-layouts/oriented',[
-	"skylark-domx-geom",
-	"skylark-domx-styler",
-	"skylark-domx-finder",
-	"./Orientation"
-],function(
-	geom,
-	styler,
-	finder,
-	Orientation
-){
-
-	/**
-	 * Detects children orientation.
-	 */
-	function oriented(el, options) {
-		var elCSS = styler.css(el),
-
-			elWidth = geom.contentRect(el).width,
-
-			child1 = finder.childAt(el, 0, options),
-			child2 = finder.childAt(el, 1, options),
-			firstChildCSS = child1 && styler.css(child1),
-			secondChildCSS = child2 && styler.css(child2),
-
-			firstChildWidth = child1 && geom.marginSize(child1).width,
-			secondChildWidth = child2 && geom.marginSize(child2).width;
-
-		if (elCSS.display === 'flex') {
-			return elCSS.flexDirection === 'column' || elCSS.flexDirection === 'column-reverse'
-			? Orientation.Vertical : Orientation.Horizontal;
-		}
-
-		if (elCSS.display === 'grid') {
-			return elCSS.gridTemplateColumns.split(' ').length <= 1 ? Orientation.Vertical : Orientation.Horizontal;
-		}
-
-		if (child1 && firstChildCSS.float !== 'none') {
-			var touchingSideChild2 = firstChildCSS.float === 'left' ? 'left' : 'right';
-
-			return child2 && (secondChildCSS.clear === 'both' || secondChildCSS.clear === touchingSideChild2) ?
-				Orientation.Vertical : Orientation.Horizontal;
-		}
-
-		return (child1 &&
-			(
-				firstChildCSS.display === 'block' ||
-				firstChildCSS.display === 'flex' ||
-				firstChildCSS.display === 'table' ||
-				firstChildCSS.display === 'grid' ||
-				firstChildWidth >= elWidth &&
-				elCSS.float === 'none' ||
-				child2 &&
-				elCSS.float === 'none' &&
-				firstChildWidth + secondChildWidth > elWidth
-			) ?
-			Orientation.Vertical : Orientation.Horizontal
-		);
-	}
-
-	return oriented;
-});
-define('skylark-sortable/dnd',[
-	"skylark-langx/skylark",
-	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
-	"skylark-domx-query",
-	"skylark-domx-browser",
-	"skylark-domx-noder",
-	"skylark-domx-finder",
-	"skylark-domx-geom",
-	"skylark-domx-styler",
-	"skylark-domx-eventer",
-	"skylark-domx-transforms",
-	"skylark-domx-scrolls/scrollingElement",
-	"skylark-domx-layouts/oriented",
-	"skylark-devices-points/touch"
-],function(
-	skylark,
-	langx,
-	isBrowser,
-	isMobile,
-	$,
-	browser,
-	noder,
-	finder,
-	geom,
-	styler,
-	eventer,
-	transforms,
-	scrollingElement,
-	oriented,
-	touch
-){
-
-	var expando = 'Sortable' + (new Date).getTime();
-
-
-	var dnd = {
-		expando,
-
-		active : null,
-		putSortable : null,
-		sortables : [],
-
-
-		dragEl : null,
-		cloneEl : null,
-
-		touchEvt : null,
-
-        prepare: function(draggable) {
-			var el = draggable.el,
-				ownerDocument = el.ownerDocument;
-
-			eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
-			eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
-			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
-		},
-
-        start: function(draggable, event) {
-        },
-
-        over : function() {
-
-        },
-
-        end: function(dropped) {
- 		},
-
-		nearestEmptyInsertDetectEvent :function (evt) {
-			if (dnd.dragEl) {
-				evt = evt.touches ? evt.touches[0] : evt;
-				var nearest = dnd._detectNearestEmptySortable(evt.clientX, evt.clientY);
-
-				if (nearest) {
-					// Create imitation event
-					var event = {};
-					for (var i in evt) {
-						event[i] = evt[i];
-					}
-					event.target = event.rootEl = nearest;
-					event.preventDefault = void 0;
-					event.stopPropagation = void 0;
-					nearest[expando]._onDragOver(event);
-				}
-			}
-		}, 
-
-		/**
-		 * Detects first nearest empty sortable to X and Y position using emptyInsertThreshold.
-		 * @param  {Number} x      X position
-		 * @param  {Number} y      Y position
-		 * @return {HTMLElement}   Element of the first found nearest Sortable
-		 */
-		_detectNearestEmptySortable : function(x, y) {
-			var sortables = this.sortables;
-
-			for (var i = 0; i < sortables.length; i++) {
-				if (finder.lastChild(sortables[i],{ignoreHidden : true,excluding : [this.ghostEl]})) continue;
-
-				var rect = geom.boundingRect(sortables[i]),
-					threshold = sortables[i][expando].options.emptyInsertThreshold,
-					insideHorizontally = x >= (rect.left - threshold) && x <= (rect.right + threshold),
-					insideVertically = y >= (rect.top - threshold) && y <= (rect.bottom + threshold);
-
-				if (threshold && insideHorizontally && insideVertically) {
-					return sortables[i];
-				}
-			}
-		},
-
-		_checkAlignment : function(evt) {
-			if (!this.dragEl || !this.dragEl.parentNode) return;
-			this.dragEl.parentNode[expando] && this.dragEl.parentNode[expando]._computeIsAligned(evt);
-		},
-
-		_emulateDragOver: function (forAutoScroll) {
-			var dragEl = this.dragEl,
-				touchEvt = this.touchEvt;
-
-			if (touchEvt) {
-				if (this._lastX === touchEvt.clientX && this._lastY === touchEvt.clientY && !forAutoScroll) {
-					return;
-				}
-				this._lastX = touchEvt.clientX;
-				this._lastY = touchEvt.clientY;
-
-				//_hideGhostForTarget();
-
-				var target = document.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
-				var parent = target;
-
-				while (target && target.shadowRoot) {
-					target = target.shadowRoot.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
-					if (target === parent) break;
-					parent = target;
-				}
-
-				if (parent) {
-					do {
-						if (parent[expando]) {
-							var inserted;
-
-							inserted = parent[expando]._onDragOver({
-								clientX: touchEvt.clientX,
-								clientY: touchEvt.clientY,
-								target: target,
-								rootEl: parent
-							});
-
-							//if (inserted && !this.options.dragoverBubble) {
-							if (inserted) {
-								break;
-							}
-						}
-
-						target = parent; // store last element
-					}
-					/* jshint boss:true */
-					while (parent = parent.parentNode);
-				}
-				dragEl.parentNode[expando]._computeIsAligned(touchEvt);
-
-				//_unhideGhostForTarget();
-			}
-		},
-
-		_onMove : function (fromEl, toEl, dragEl, dragRect, targetEl, targetRect, originalEvt, willInsertAfter) {
-			var evt,
-				sortable = fromEl[expando],
-				onMoveFn = sortable.options.onMove,
-				retVal;
-
-			evt = eventer.create("move",{
-				to : toEl,
-				from : fromEl,
-				dragged : dragEl,
-				draggedRect: dragRect,
-				related : targetEl || toEl,
-				relatedRect : targetRect || geom.boundingRect(toEl),
-				willInsertAfter : willInsertAfter,
-				originalEvent : originalEvt
-			});
-
-			fromEl.dispatchEvent(evt);
-
-			if (onMoveFn) {
-				retVal = onMoveFn.call(sortable, evt, originalEvt);
-			}
-
-			return retVal;
-		},
-
-		_dispatchEvent : function (
-			sortable, rootEl, name,
-			targetEl, toEl, fromEl,
-			startIndex, newIndex,
-			startDraggableIndex, newDraggableIndex,
-			originalEvt
-		) {
-			sortable = (sortable || rootEl[expando]);
-			var evt,
-				options = sortable.options,
-				onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1),
-				putSortable = this.putSortable;
-
-			evt = eventer.create(name,{
-				to : toEl || rootEl,
-				from : fromEl || rootEl,
-				item : targetEl || rootEl,
-				clone : this.cloneEl,
-				oldIndex : startIndex,
-				newIndex : newIndex,
-				oldDraggableIndex : startDraggableIndex,
-				newDraggableIndex : newDraggableIndex,
-				originalEvent : originalEvt,
-				pullMode : putSortable ? putSortable.lastPutMode : undefined
-			});
-			if (rootEl) {
-				rootEl.dispatchEvent(evt);
-			}
-
-			if (options[onName]) {
-				options[onName].call(sortable, evt);
-			}
-		}
-
-	};
-
-
-	return dnd;
-	
-});
 define('skylark-sortable/autoscroll',[
 	"skylark-langx/langx",
 	"skylark-langx-hoster/isBrowser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
-	"skylark-domx-scrolls/scrollingElement",
-	"./dnd"
+	"skylark-domx-scrolls/scrollingElement"
 ],function(
 	langx,
 	isBrowser,
 	geom,
 	styler,
-	scrollingElement,
-	dnd
+	scrollingElement
 ){
+    'use strict';
+
 	var autoScrolls = [],
 		scrolling = false,
+		scrollEl,
+		scrollCustomFn,
+		pointerElemChangedInterval,
+
 		scrollParentEl = null;
 
 	var
@@ -666,10 +375,10 @@ define('skylark-sortable/autoscroll',[
 	},
 
 
-	_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback) {
+	_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback,expando) {
 		// Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
 		if (options.scroll) {
-			var _this = rootEl ? rootEl[dnd.expando] : window,
+			var _this = rootEl ? rootEl[expando] : window,
 				sens = options.scrollSensitivity,
 				speed = options.scrollSpeed,
 
@@ -860,6 +569,11 @@ define('skylark-sortable/autoscroll',[
 	}
 
 	
+	function _nulling() {
+		pointerElemChangedInterval && clearInterval(pointerElemChangedInterval);
+		pointerElemChangedInterval = null;
+
+	}
 	return {
 		autoScrolls,
 		
@@ -871,99 +585,71 @@ define('skylark-sortable/autoscroll',[
 		_handleAutoScroll,
 
 		_throttle,
-		_cancelThrottle
+		_cancelThrottle,
+		_nulling
 	}
 });
-define('skylark-sortable/containers',[
-	"skylark-langx/skylark",
-	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
-	"skylark-domx-query",
-	"skylark-domx-browser",
-	"skylark-domx-noder",
-	"skylark-domx-finder",
+define('skylark-domx-layouts/oriented',[
 	"skylark-domx-geom",
 	"skylark-domx-styler",
-	"skylark-domx-eventer",
-	"skylark-domx-transforms",
-	"skylark-domx-scrolls/scrollingElement",
-	"skylark-domx-layouts/oriented",
-	"skylark-devices-points/touch",
-	"./autoscroll",
-	"./dnd"
+	"skylark-domx-finder",
+	"./Orientation"
 ],function(
-	skylark,
-	langx,
-	isBrowser,
-	isMobile,
-	$,
-	browser,
-	noder,
-	finder,
 	geom,
 	styler,
-	eventer,
-	transforms,
-	scrollingElement,
-	oriented,
-	touch,
-	autoscroll,
-	dnd
+	finder,
+	Orientation
 ){
-	var
-		/**
-		 * Returns the index of an element within its parent for a selected set of
-		 * elements
-		 * @param  {HTMLElement} el
-		 * @param  {selector} selector
-		 * @return {number}
-		 */
-		_index = function (el, selector) {
-			return finder.index(el,function(el){
-				if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== dnd.cloneEl && (!selector || finder.matches(el, selector))) {
-					return true;
-				}
 
-				return false;			
-			})
-		},
+	/**
+	 * Detects children orientation.
+	 */
+	function oriented(el, options) {
+		var elCSS = styler.css(el),
 
-		_isClientInRowColumn = function(x, y, el, axis, options) {
-			var targetRect = geom.boundingRect(el),
-				targetS1Opp = axis === 'vertical' ? targetRect.left : targetRect.top,
-				targetS2Opp = axis === 'vertical' ? targetRect.right : targetRect.bottom,
-				mouseOnOppAxis = axis === 'vertical' ? x : y;
+			elWidth = geom.contentRect(el).width,
 
-			return targetS1Opp < mouseOnOppAxis && mouseOnOppAxis < targetS2Opp;
-		},
+			child1 = finder.childAt(el, 0, options),
+			child2 = finder.childAt(el, 1, options),
+			firstChildCSS = child1 && styler.css(child1),
+			secondChildCSS = child2 && styler.css(child2),
 
-		_isElInRowColumn = function(el1, el2, axis) {
-			var dragEl = dnd.dragEl;
+			firstChildWidth = child1 && geom.marginSize(child1).width,
+			secondChildWidth = child2 && geom.marginSize(child2).width;
 
-			var el1Rect = geom.boundingRect(el1),//el1 === dragEl && realDragElRect || geom.boundingRect(el1),
-				el2Rect = geom.boundingRect(el2),//el2 === dragEl && realDragElRect || geom.boundingRect(el2),
-				el1S1Opp = axis === 'vertical' ? el1Rect.left : el1Rect.top,
-				el1S2Opp = axis === 'vertical' ? el1Rect.right : el1Rect.bottom,
-				el1OppLength = axis === 'vertical' ? el1Rect.width : el1Rect.height,
-				el2S1Opp = axis === 'vertical' ? el2Rect.left : el2Rect.top,
-				el2S2Opp = axis === 'vertical' ? el2Rect.right : el2Rect.bottom,
-				el2OppLength = axis === 'vertical' ? el2Rect.width : el2Rect.height;
+		if (elCSS.display === 'flex') {
+			return elCSS.flexDirection === 'column' || elCSS.flexDirection === 'column-reverse'
+			? Orientation.Vertical : Orientation.Horizontal;
+		}
 
-			return (
-				el1S1Opp === el2S1Opp ||
-				el1S2Opp === el2S2Opp ||
-				(el1S1Opp + el1OppLength / 2) === (el2S1Opp + el2OppLength / 2)
-			);
-		};
+		if (elCSS.display === 'grid') {
+			return elCSS.gridTemplateColumns.split(' ').length <= 1 ? Orientation.Vertical : Orientation.Horizontal;
+		}
 
+		if (child1 && firstChildCSS.float !== 'none') {
+			var touchingSideChild2 = firstChildCSS.float === 'left' ? 'left' : 'right';
 
-	return {
-		_index,
-		_isElInRowColumn,
-		_isClientInRowColumn
+			return child2 && (secondChildCSS.clear === 'both' || secondChildCSS.clear === touchingSideChild2) ?
+				Orientation.Vertical : Orientation.Horizontal;
+		}
+
+		return (child1 &&
+			(
+				firstChildCSS.display === 'block' ||
+				firstChildCSS.display === 'flex' ||
+				firstChildCSS.display === 'table' ||
+				firstChildCSS.display === 'grid' ||
+				firstChildWidth >= elWidth &&
+				elCSS.float === 'none' ||
+				child2 &&
+				elCSS.float === 'none' &&
+				firstChildWidth + secondChildWidth > elWidth
+			) ?
+			Orientation.Vertical : Orientation.Horizontal
+		);
 	}
-	
+
+	return oriented;
 });
 define('skylark-sortable/ghoster',[
 	"skylark-langx/skylark",
@@ -998,7 +684,9 @@ define('skylark-sortable/ghoster',[
 	oriented,
 	touch
 ){
-		/**
+    'use strict';
+
+	/**
 	 * Returns the "bounding client rect" of given element
 	 * @param  {HTMLElement} el                The element whose boundingClientRect is wanted
 	 * @param  {[HTMLElement]} container       the parent the element will be placed in
@@ -1160,13 +848,1011 @@ define('skylark-sortable/ghoster',[
 
 		getRelativeScrollOffset : function(){
 			return this.PositionGhostAbsolutely && this.ghostRelativeParent && autoscroll._getRelativeScrollOffset(this.ghostRelativeParent);
-		}  
+		},
+
+		remove : function() {
+			if (this.ghostEl) {
+				noder.remove(this.ghostEl);
+			} 
+
+		}
 
 
 	};
 
 	return ghoster;
 	
+});
+define('skylark-sortable/dnd',[
+	"skylark-langx/skylark",
+	"skylark-langx/langx",
+	"skylark-langx-hoster/isBrowser",
+	"skylark-langx-hoster/isMobile",
+	"skylark-domx-query",
+	"skylark-domx-browser",
+	"skylark-domx-noder",
+	"skylark-domx-finder",
+	"skylark-domx-geom",
+	"skylark-domx-styler",
+	"skylark-domx-eventer",
+	"skylark-domx-transforms",
+	"skylark-domx-scrolls/scrollingElement",
+	"skylark-domx-layouts/oriented",
+	"skylark-devices-points/touch",
+	"./autoscroll",
+	"./ghoster"
+],function(
+	skylark,
+	langx,
+	isBrowser,
+	isMobile,
+	$,
+	browser,
+	noder,
+	finder,
+	geom,
+	styler,
+	eventer,
+	transforms,
+	scrollingElement,
+	oriented,
+	touch,
+	autoscroll,
+	ghoster
+){
+    'use strict';
+
+
+	var expando = 'Sortable' + (new Date).getTime();
+
+
+	var dnd = {
+		log : function log(category,message) {
+			$("#console").append("<div>"+category+":"+message+"</div>");	
+		},
+
+		expando,
+
+		activeGroup : null,
+		active : null,
+		putSortable : null,
+		sortables : [],
+
+
+		dragEl : null,
+		cloneEl : null,
+
+		ignoreNextClick : false,
+        awaitingDragStarted : false,
+
+
+		touchEvt : null,
+
+        prepare: function(draggable) {
+        	this.draggable = draggable;
+			var el = draggable.elm(),
+				ownerDocument = el.ownerDocument;
+
+			eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
+			eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
+			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
+		},
+
+        start: function(draggable, event) {
+            if (this.draggable.nativeDraggable) {
+                eventer.on(document, 'dragover', this._handleAutoScroll);
+                eventer.on(document, 'dragover', this._checkAlignment);
+            } else {
+                eventer.on(document, 'mousemove', this._onTouchMove);
+            }
+        },
+
+        over : function(evt) {
+			this._handleAutoScroll(evt);
+        },
+
+        end: function(dropped) {
+			if (this.draggable.nativeDraggable) {
+				eventer.off(document, 'dragover', this._handleAutoScroll);
+				eventer.off(document, 'dragover', this._checkAlignment);
+			} else {
+		        // Unbind events
+	            eventer.off(document, 'mousemove', this._onTouchMove);
+
+			}
+
+        	this.draggable = null;
+
+        	this._nulling();
+ 		},
+
+		nearestEmptyInsertDetectEvent :function (evt) {
+			if (dnd.dragEl) {
+				evt = evt.touches ? evt.touches[0] : evt;
+				var nearest = dnd._detectNearestEmptySortable(evt.clientX, evt.clientY);
+
+				if (nearest) {
+					// Create imitation event
+					var event = {};
+					for (var i in evt) {
+						event[i] = evt[i];
+					}
+					event.target = event.rootEl = nearest;
+					event.preventDefault = void 0;
+					event.stopPropagation = void 0;
+					nearest[expando]._onDragOver(event);
+				}
+			}
+		}, 
+
+		/**
+		 * Detects first nearest empty sortable to X and Y position using emptyInsertThreshold.
+		 * @param  {Number} x      X position
+		 * @param  {Number} y      Y position
+		 * @return {HTMLElement}   Element of the first found nearest Sortable
+		 */
+		_detectNearestEmptySortable : function(x, y) {
+			var sortables = this.sortables;
+
+			for (var i = 0; i < sortables.length; i++) {
+				if (finder.lastChild(sortables[i],{ignoreHidden : true,excluding : [this.ghostEl]})) continue;
+
+				var rect = geom.boundingRect(sortables[i]),
+					threshold = sortables[i][expando].options.emptyInsertThreshold,
+					insideHorizontally = x >= (rect.left - threshold) && x <= (rect.right + threshold),
+					insideVertically = y >= (rect.top - threshold) && y <= (rect.bottom + threshold);
+
+				if (threshold && insideHorizontally && insideVertically) {
+					return sortables[i];
+				}
+			}
+		},
+
+		_checkAlignment : function(evt) {
+			if (!this.dragEl || !this.dragEl.parentNode) return;
+			this.dragEl.parentNode[expando] && this.dragEl.parentNode[expando]._computeIsAligned(evt);
+		},
+
+		_emulateDragOver: function (forAutoScroll) {
+			var dragEl = this.dragEl,
+				touchEvt = this.touchEvt;
+
+			if (touchEvt) {
+				if (this._lastX === touchEvt.clientX && this._lastY === touchEvt.clientY && !forAutoScroll) {
+					return;
+				}
+				this._lastX = touchEvt.clientX;
+				this._lastY = touchEvt.clientY;
+
+				//_hideGhostForTarget();
+
+				var target = document.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+				var parent = target;
+
+				while (target && target.shadowRoot) {
+					target = target.shadowRoot.elementFromPoint(touchEvt.clientX, touchEvt.clientY);
+					if (target === parent) break;
+					parent = target;
+				}
+
+				if (parent) {
+					do {
+						if (parent[expando]) {
+							var inserted;
+
+							inserted = parent[expando]._onDragOver({
+								clientX: touchEvt.clientX,
+								clientY: touchEvt.clientY,
+								target: target,
+								rootEl: parent
+							});
+
+							//if (inserted && !this.options.dragoverBubble) {
+							if (inserted) {
+								break;
+							}
+						}
+
+						target = parent; // store last element
+					}
+					/* jshint boss:true */
+					while (parent = parent.parentNode);
+				}
+				dragEl.parentNode[expando]._computeIsAligned(touchEvt);
+
+				//_unhideGhostForTarget();
+			}
+		},
+
+		_onMove : function (fromEl, toEl, dragEl, dragRect, targetEl, targetRect, originalEvt, willInsertAfter) {
+			var evt,
+				sortable = fromEl[expando],
+				onMoveFn = sortable.options.onMove,
+				retVal;
+
+			evt = eventer.create("move",{
+				to : toEl,
+				from : fromEl,
+				dragged : dragEl,
+				draggedRect: dragRect,
+				related : targetEl || toEl,
+				relatedRect : targetRect || geom.boundingRect(toEl),
+				willInsertAfter : willInsertAfter,
+				originalEvent : originalEvt
+			});
+
+			fromEl.dispatchEvent(evt);
+
+			if (onMoveFn) {
+				retVal = onMoveFn.call(sortable, evt, originalEvt);
+			}
+
+			return retVal;
+		},
+
+		_dispatchEvent : function (
+			sortable, rootEl, name,
+			targetEl, toEl, fromEl,
+			startIndex, newIndex,
+			startDraggableIndex, newDraggableIndex,
+			originalEvt
+		) {
+			sortable = (sortable || rootEl[expando]);
+			var evt,
+				options = sortable.options,
+				onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1),
+				putSortable = this.putSortable;
+
+			evt = eventer.create(name,{
+				to : toEl || rootEl,
+				from : fromEl || rootEl,
+				item : targetEl || rootEl,
+				clone : this.cloneEl,
+				oldIndex : startIndex,
+				newIndex : newIndex,
+				oldDraggableIndex : startDraggableIndex,
+				newDraggableIndex : newDraggableIndex,
+				originalEvent : originalEvt,
+				pullMode : putSortable ? putSortable.lastPutMode : undefined
+			});
+			if (rootEl) {
+				rootEl.dispatchEvent(evt);
+			}
+
+			if (options[onName]) {
+				options[onName].call(sortable, evt);
+			}
+		},
+
+		_disableDraggable : function (el) {
+			el.draggable = false;
+		},
+
+		_handleAutoScroll: function(evt, fallback) {
+
+			if (!dnd.dragEl || !dnd.draggable.options.scroll) return;
+
+			return autoscroll._handleAutoScroll(evt,dnd.draggable.options,fallback);
+		},
+
+        _onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
+            dnd.log("_onTouchMove","start");
+            var ghostEl = ghoster.ghostEl,
+            	draggable = dnd.draggable;
+            if (tapEvt) {
+                var options =  draggable.options,
+                    fallbackTolerance = options.fallbackTolerance,
+                    fallbackOffset = options.fallbackOffset,
+                    touch = evt.touches ? evt.touches[0] : evt,
+                    matrix = ghostEl && transforms.matrix(ghostEl),
+                    scaleX = ghostEl && matrix && matrix.a,
+                    scaleY = ghostEl && matrix && matrix.d,
+                    relativeScrollOffset = ghoster.getRelativeScrollOffset(),
+                    dx = ((touch.clientX - tapEvt.clientX)
+                            + fallbackOffset.x) / (scaleX || 1)
+                            + (relativeScrollOffset ? (relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0]) : 0) / (scaleX || 1),
+                    dy = ((touch.clientY - tapEvt.clientY)
+                            + fallbackOffset.y) / (scaleY || 1)
+                            + (relativeScrollOffset ? (relativeScrollOffset[1] - ghostRelativeParentInitialScroll[1]) : 0) / (scaleY || 1),
+                    translate3d = evt.touches ? 'translate3d(' + dx + 'px,' + dy + 'px,0)' : 'translate(' + dx + 'px,' + dy + 'px)';
+
+                // only set the status to dragging, when we are actually dragging
+                if (!dnd.active && !dnd.awaitingDragStarted) {
+                    if (fallbackTolerance &&
+                        Math.min( Math.abs(touch.clientX - draggable._lastX),  Math.abs(touch.clientY - draggable._lastY)) < fallbackTolerance
+                    ) {
+                        return;
+                    }
+                    draggable._onDragStart(evt, true);
+                }
+
+                !forAutoScroll && dnd._handleAutoScroll(touch, true);
+
+                moved = true;
+                dnd.touchEvt = touch;
+
+                if (ghostEl) {
+                    //styler.css(ghostEl, 'webkitTransform', translate3d);
+                    //styler.css(ghostEl, 'mozTransform', translate3d);
+                    //styler.css(ghostEl, 'msTransform', translate3d);
+                    styler.css(ghostEl, 'transform', translate3d);
+
+                }
+
+                //evt.cancelable && evt.preventDefault();
+                evt.preventDefault()
+            }
+        },
+
+		_nulling: function() {
+
+			dnd.rootEl =
+			dnd.dragEl =
+			dnd.parentEl =
+			ghoster.ghostEl =
+			dnd.nextEl =
+			dnd.cloneEl =
+			///lastDownEl =
+
+			autoscroll.scrollEl =
+			autoscroll.scrollParentEl =
+			autoscroll.autoScrolls.length =
+
+
+			//tapEvt =
+			dnd.touchEvt =
+
+			dnd.oldIndex =
+
+			dnd.putSortable =
+			dnd.activeGroup =
+			dnd.active = null;
+
+		},
+
+
+	};
+
+
+	return dnd;
+	
+});
+define('skylark-sortable/containers',[
+	"skylark-langx/skylark",
+	"skylark-langx/langx",
+	"skylark-langx-hoster/isBrowser",
+	"skylark-langx-hoster/isMobile",
+	"skylark-domx-query",
+	"skylark-domx-browser",
+	"skylark-domx-noder",
+	"skylark-domx-finder",
+	"skylark-domx-geom",
+	"skylark-domx-styler",
+	"skylark-domx-eventer",
+	"skylark-domx-transforms",
+	"skylark-domx-scrolls/scrollingElement",
+	"skylark-domx-layouts/oriented",
+	"skylark-devices-points/touch",
+	"./autoscroll",
+	"./dnd"
+],function(
+	skylark,
+	langx,
+	isBrowser,
+	isMobile,
+	$,
+	browser,
+	noder,
+	finder,
+	geom,
+	styler,
+	eventer,
+	transforms,
+	scrollingElement,
+	oriented,
+	touch,
+	autoscroll,
+	dnd
+){
+    'use strict';
+
+	var
+		/**
+		 * Returns the index of an element within its parent for a selected set of
+		 * elements
+		 * @param  {HTMLElement} el
+		 * @param  {selector} selector
+		 * @return {number}
+		 */
+		_index = function (el, selector) {
+			return finder.index(el,function(el){
+				if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== dnd.cloneEl && (!selector || finder.matches(el, selector))) {
+					return true;
+				}
+
+				return false;			
+			})
+		},
+
+		_isClientInRowColumn = function(x, y, el, axis, options) {
+			var targetRect = geom.boundingRect(el),
+				targetS1Opp = axis === 'vertical' ? targetRect.left : targetRect.top,
+				targetS2Opp = axis === 'vertical' ? targetRect.right : targetRect.bottom,
+				mouseOnOppAxis = axis === 'vertical' ? x : y;
+
+			return targetS1Opp < mouseOnOppAxis && mouseOnOppAxis < targetS2Opp;
+		},
+
+		_isElInRowColumn = function(el1, el2, axis) {
+			var dragEl = dnd.dragEl;
+
+			var el1Rect = geom.boundingRect(el1),//el1 === dragEl && realDragElRect || geom.boundingRect(el1),
+				el2Rect = geom.boundingRect(el2),//el2 === dragEl && realDragElRect || geom.boundingRect(el2),
+				el1S1Opp = axis === 'vertical' ? el1Rect.left : el1Rect.top,
+				el1S2Opp = axis === 'vertical' ? el1Rect.right : el1Rect.bottom,
+				el1OppLength = axis === 'vertical' ? el1Rect.width : el1Rect.height,
+				el2S1Opp = axis === 'vertical' ? el2Rect.left : el2Rect.top,
+				el2S2Opp = axis === 'vertical' ? el2Rect.right : el2Rect.bottom,
+				el2OppLength = axis === 'vertical' ? el2Rect.width : el2Rect.height;
+
+			return (
+				el1S1Opp === el2S1Opp ||
+				el1S2Opp === el2S2Opp ||
+				(el1S1Opp + el1OppLength / 2) === (el2S1Opp + el2OppLength / 2)
+			);
+		};
+
+
+	return {
+		_index,
+		_isElInRowColumn,
+		_isClientInRowColumn
+	}
+	
+});
+define('skylark-sortable/Draggable',[
+    "skylark-langx/skylark",
+    "skylark-langx/langx",
+    "skylark-langx-hoster/isBrowser",
+    "skylark-langx-hoster/isMobile",
+    "skylark-domx-query",
+    "skylark-domx-browser",
+    "skylark-domx-noder",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-styler",
+    "skylark-domx-eventer",
+    "skylark-domx-transforms",
+    "skylark-domx-scrolls/scrollingElement",
+    "skylark-domx-layouts/oriented",
+    "skylark-domx-plugins",
+    "skylark-devices-points/touch",
+    "./autoscroll",
+    "./containers",
+    "./dnd",
+    "./ghoster"
+],function(
+    skylark,
+    langx,
+    isBrowser,
+    isMobile,
+    $,
+    browser,
+    noder,
+    finder,
+    geom,
+    styler,
+    eventer,
+    transforms,
+    scrollingElement,
+    oriented,
+    plugins,
+    touch,
+    autoscroll,
+    containers,
+    dnd,
+    ghoster
+){
+
+    'use strict';
+
+    var 
+        lastDownEl,
+        tapEvt,
+        scrolling,
+
+        savedInputChecked = [];
+
+
+    function _find(ctx, tagName, iterator) {
+        if (ctx) {
+            var list = ctx.getElementsByTagName(tagName), i = 0, n = list.length;
+
+            if (iterator) {
+                for (; i < n; i++) {
+                    iterator(list[i], i);
+                }
+            }
+
+            return list;
+        }
+
+        return [];
+    }
+
+
+    function _saveInputCheckedState(root) {
+        savedInputChecked.length = 0;
+
+        var inputs = root.getElementsByTagName('input');
+        var idx = inputs.length;
+
+        while (idx--) {
+            var el = inputs[idx];
+            el.checked && savedInputChecked.push(el);
+        }
+    }
+
+
+    var Draggable = plugins.Plugin.inherit({
+        klassName: "Draggable",
+        
+        pluginName : "intg.sortable.draggable",
+
+        options : {
+            draggingClass : "dragging"
+        },
+
+        _construct: function(elm, options) {
+            this.overrided(elm,options);
+            var el = this._elm;
+
+            // Setup drag mode
+            this.nativeDraggable = options.nativeDraggable;
+            this.sortable = options.sortable;
+
+            if (this.nativeDraggable) {
+                // Touch start threshold cannot be greater than the native dragstart threshold
+                this.options.touchStartThreshold = 1;
+            }
+
+
+            // Bind all private methods
+            for (var fn in this) {
+                if (fn.charAt(0) === '_' && typeof this[fn] === 'function') {
+                    this[fn] = this[fn].bind(this);
+                }
+            }
+
+
+            // Bind events
+            touch.mousy(el);
+            eventer.on(el, 'mousedown', this._onTapStart);
+
+        },
+
+        // handle moudedown event
+        _onTapStart: function (/** Event|TouchEvent */evt) {
+            //if (!evt.cancelable) return;
+            var _this = this,
+                el = this._elm,
+                options = this.options,
+                preventOnFilter = options.preventOnFilter,
+                type = evt.type,
+                touch = evt.touches && evt.touches[0],
+                target = (touch || evt).target,
+                originalTarget = evt.target.shadowRoot && ((evt.path && evt.path[0]) || (evt.composedPath && evt.composedPath()[0])) || target,
+                filter = options.filter,
+                startIndex,
+                startDraggableIndex;
+
+            _saveInputCheckedState(el);
+
+            // Don't trigger start event when an element is been dragged, otherwise the evt.oldindex always wrong when set option.group.
+            if (dnd.dragEl) {
+                return;
+            }
+
+            if (/mousedown|pointerdown/.test(type) && evt.button !== 0 || options.disabled) {
+                return; // only left button and enabled
+            }
+
+            // cancel dnd if original target is content editable
+            if (originalTarget.isContentEditable) {
+                return;
+            }
+
+            target = finder.closest(target, options.draggable, el, false);
+
+
+            if (lastDownEl === target) {
+                // Ignoring duplicate `down`
+                return;
+            }
+
+            dnd.log("_onTapStart",target.tagName+","+target.className);
+
+            // Get the index of the dragged element within its parent
+            startIndex = containers._index(target);
+            startDraggableIndex = containers._index(target, options.draggable);
+
+            // Check filter
+            if (typeof filter === 'function') {
+                if (filter.call(this, evt, target, this)) {
+                    dnd._dispatchEvent(_this, originalTarget, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
+                    preventOnFilter && evt.cancelable && evt.preventDefault();
+                    return; // cancel dnd
+                }
+            }
+            else if (filter) {
+                filter = filter.split(',').some(function (criteria) {
+                    criteria = finder.closest(originalTarget, criteria.trim(), el, false);
+
+                    if (criteria) {
+                        dnd._dispatchEvent(_this, criteria, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
+                        return true;
+                    }
+                });
+
+                if (filter) {
+                    preventOnFilter && evt.cancelable && evt.preventDefault();
+                    return; // cancel dnd
+                }
+            }
+
+            if (options.handle && !finder.closest(originalTarget, options.handle, el, false)) {
+                return;
+            }
+
+            // Prepare `dragstart`
+            this._prepareDragStart(evt, touch, target, startIndex, startDraggableIndex);
+        },
+
+        _prepareDragStart: function (/** Event */evt, /** Touch */touch, /** HTMLElement */target, /** Number */startIndex, /** Number */startDraggableIndex) {
+            var _this = this,
+                el = _this._elm,
+                options = _this.options,
+                ownerDocument = el.ownerDocument,
+                dragStartFn,
+                dragEl = dnd.dragEl,
+                rootEl,
+                parentEl = dnd.parentEl,
+                nextEl = dnd.nextEl,
+                oldIndex = dnd.oldIndex,
+                oldDraggableIndex = dnd.oldDraggableIndex;
+
+            dnd.log("_prepareDragStart","start");
+            if (target && !dragEl && (target.parentNode === el)) {
+                rootEl = el;
+                dragEl = dnd.dragEl = target;
+                parentEl = dnd.parentEl= dragEl.parentNode;
+                nextEl = dnd.nextEl = dragEl.nextSibling;
+                lastDownEl = target;
+                dnd.activeGroup = this.sortable.options.group;
+                oldIndex = dnd.oldIndex = startIndex;
+                oldDraggableIndex = dnd.oldDraggableIndex =  startDraggableIndex;
+
+                tapEvt = {
+                    target: dragEl,
+                    clientX: (touch || evt).clientX,
+                    clientY: (touch || evt).clientY
+                };
+
+                this._lastX = (touch || evt).clientX;
+                this._lastY = (touch || evt).clientY;
+
+                dragEl.style['will-change'] = 'all';
+                // undo animation if needed
+                dragEl.style.transition = '';
+                dragEl.style.transform = '';
+
+                dragStartFn = function () {
+                    // Delayed drag has been triggered
+                    // we can re-enable the events: touchmove/mousemove
+                    _this._disableDelayedDragEvents();
+
+                    if ( _this.nativeDraggable) {
+                        dragEl.draggable = true;
+                    }
+
+                    // Bind the events: dragstart/dragend
+                    _this._triggerDragStart(evt, touch);
+
+                    // Drag start event
+                    dnd._dispatchEvent(_this, rootEl, 'choose', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex);
+
+                    // Chosen item
+                    styler.toggleClass(dragEl, options.chosenClass, true);
+                };
+
+                // Disable "draggable"
+                options.ignore.split(',').forEach(function (criteria) {
+                    _find(dragEl, criteria.trim(), dnd._disableDraggable);
+                });
+
+                //eventer.on(ownerDocument, 'mouseup', _this._onDrop); // TODO : lwf
+                ///eventer.on(ownerDocument, 'touchend', _this._onDrop);
+                ///eventer.on(ownerDocument, 'touchcancel', _this._onDrop);
+
+                // Make dragEl draggable (must be before delay for FireFox)
+                ///if (FireFox && this.nativeDraggable) {
+                if (this.nativeDraggable) {
+                   this.options.touchStartThreshold = 4;
+                    dragEl.draggable = true;
+                }
+
+                // Delay is impossible for native DnD in Edge or IE
+                if (options.delay && (options.delayOnTouchOnly ? touch : true) && (!this.nativeDraggable || !(Edge || IE11OrLess))) {
+                    // If the user moves the pointer or let go the click or touch
+                    // before the delay has been reached:
+                    // disable the delayed drag
+                    eventer.on(ownerDocument, 'mouseup', _this._disableDelayedDrag);
+                    //eventer.on(ownerDocument, 'touchend', _this._disableDelayedDrag);
+                    //eventer.on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
+                    eventer.on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
+                    //eventer.on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
+                    //options.supportPointer && eventer.on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
+
+                    _this._dragStartTimer = setTimeout(dragStartFn, options.delay);
+                } else {
+                    dragStartFn();
+                }
+            }
+        },
+
+        _delayedDragTouchMoveHandler: function (/** TouchEvent|PointerEvent **/e) {
+            var touch = e.touches ? e.touches[0] : e;
+            if (Math.max( Math.abs(touch.clientX - this._lastX),  Math.abs(touch.clientY - this._lastY))
+                    >= Math.floor(this.options.touchStartThreshold / (this.nativeDraggable && window.devicePixelRatio || 1))
+            ) {
+                this._disableDelayedDrag();
+            }
+        },
+
+        _disableDelayedDrag: function () {
+            dnd.dragEl && dnd._disableDraggable(dnd.dragEl);
+            clearTimeout(this._dragStartTimer);
+
+            this._disableDelayedDragEvents();
+        },
+
+        _disableDelayedDragEvents: function () {
+            var ownerDocument = this._elm.ownerDocument;
+            eventer.off(ownerDocument, 'mouseup', this._disableDelayedDrag);
+            eventer.off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
+        },
+
+        //native dnd mode : register _OnDragStart for dragstart event handler 
+        //moused dnd mode : register  _onTouchMove for mousemove event hander, _onTouchMove calls _OnDragStart
+        _triggerDragStart: function (/** Event */evt, /** Touch */touch) {
+            dnd.log("_triggerDragStart","start");
+            dnd.log("_triggerDragStart","nativeDraggable is " +  this.nativeDraggable);
+
+            dnd.prepare(this);
+
+            if (!this.nativeDraggable) {
+                ////eventer.on(document, 'mousemove', this._onTouchMove);
+            } else {
+                eventer.on(dnd.dragEl, 'dragend', this._onDragEnd);
+                eventer.on(dnd.dragEl, 'dragstart', this._onDragStart);
+            }
+
+            try {
+                if (document.selection) {
+                    // Timeout neccessary for IE9
+                    langx.defer(function () {
+                        document.selection.empty();
+                    });
+                } else {
+                    window.getSelection().removeAllRanges();
+                }
+            } catch (err) {
+            }
+        },
+
+        _onDragStart: function (/**Event*/evt, /**boolean*/fallback) {
+            var _this = this,
+                dragEl = dnd.dragEl,
+                rootEl = this._elm;
+
+            var dataTransfer = evt.dataTransfer;
+            var options = _this.options;
+
+            // Setup clone
+            var cloneEl = dnd.cloneEl = noder.clone(dragEl,true);
+
+            cloneEl.draggable = false;
+            cloneEl.style['will-change'] = '';
+
+            this._hideClone();
+
+            styler.toggleClass(cloneEl, _this.options.chosenClass, false);
+
+
+            // #1143: IFrame support workaround
+            _this._cloneId = langx.defer(function () {
+                if (!_this.options.removeCloneOnHide) {
+                    rootEl.insertBefore(cloneEl, dragEl);
+                }
+                dnd._dispatchEvent(_this, rootEl, 'clone', dragEl);
+            });
+
+
+            !fallback && styler.toggleClass(dragEl, options.dragClass, true);
+
+            // Set proper drop events
+            if (fallback) {
+                dnd.ignoreNextClick = true;
+                _this._loopId = setInterval(dnd._emulateDragOver.bind(dnd), 50);
+            } else {
+                // Undo what was set in _prepareDragStart before drag started
+                //eventer.off(document, 'mouseup', _this._onDrop); //TODO : lwf
+                ///eventer.off(document, 'touchend', _this._onDrop);
+                ///eventer.off(document, 'touchcancel', _this._onDrop);
+
+                if (dataTransfer) {
+                    dataTransfer.effectAllowed = 'move';
+                    options.setData && options.setData.call(_this, dataTransfer, dragEl);
+                }
+
+                ////eventer.on(document, 'drop', _this);
+
+                // #1276 fix:
+                styler.css(dragEl, 'transform', 'translateZ(0)');
+            }
+
+            dnd.awaitingDragStarted = true;
+
+            _this._dragStartId = langx.defer(_this._dragStarted.bind(_this, fallback, evt));
+            ///eventer.on(document, 'selectstart', _this);
+            ///if (Safari) {
+            ///    styler.css(document.body, 'user-select', 'none');
+            ///}
+        },
+
+        //
+        //
+        _dragStarted: function (fallback, evt) {
+            dnd.awaitingDragStarted = false;
+            var dragEl = dnd.dragEl,
+                rootEl = this._elm,
+                oldIndex = dnd.oldIndex,
+                oldDraggableIndex = dnd.oldDraggableIndex;
+
+            if (rootEl && dragEl) {
+                //if (this.nativeDraggable) {
+                //    eventer.on(document, 'dragover', this._handleAutoScroll);
+                //    eventer.on(document, 'dragover', dnd._checkAlignment);
+                //}
+                dnd.start(this);
+                var options = this.options;
+
+                // Apply effect
+                !fallback && styler.toggleClass(dragEl, options.dragClass, false);
+                styler.toggleClass(dragEl, options.ghostClass, true);
+
+                // In case dragging an animated element
+                styler.css(dragEl, 'transform', '');
+
+                dnd.active = this.sortable;
+
+                fallback && this._appendGhost();
+
+                // Drag start event
+                dnd._dispatchEvent(this, rootEl, 'start', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex, undefined, evt);
+            } else {
+                this._nulling();
+            }
+        },
+
+        _nulling: function() {
+            lastDownEl = null;
+            tapEvt = null;
+
+            savedInputChecked.forEach(function (el) {
+                el.checked = true;
+            });
+
+
+            savedInputChecked.length = 0;
+
+        },
+
+        _hideClone: function() {
+            if (!dnd.cloneEl.cloneHidden) {
+                styler.hide(dnd.cloneEl);
+                dnd.cloneEl.cloneHidden = true;
+                if (dnd.cloneEl.parentNode && this.options.removeCloneOnHide) {
+                    dnd.cloneEl.parentNode.removeChild(dnd.cloneEl);
+                }
+            }
+        },
+
+        _showClone: function(putSortable) {
+            var rootEl = dnd.active.el,
+                nextEl = dnd.nextEl;
+
+            if (putSortable.lastPutMode !== 'clone') {
+                this._hideClone();
+                return;
+            }
+
+            if (dnd.cloneEl.cloneHidden) {
+                // show clone at dragEl or original position
+                if (rootEl.contains(dnd.dragEl) && !this.options.group.revertClone) {
+                    rootEl.insertBefore(dnd.cloneEl, dnd.dragEl);
+                } else if (nextEl) {
+                    rootEl.insertBefore(dnd.cloneEl, nextEl);
+                } else {
+                    rootEl.appendChild(dnd.cloneEl);
+                }
+
+                if (this.options.group.revertClone) {
+                    this._animate(dnd.dragEl, dnd.cloneEl);
+                }
+                styler.show(dnd.cloneEl);
+                dnd.cloneEl.cloneHidden = false;
+            }
+        },
+
+        _onDragEnd: function (/**Event*/evt) {
+            var el = this._elm,
+                options = this.options,
+                dragEl = dnd.dragEl,
+                putSortable = dnd.putSortable;
+
+            dnd.awaitingDragStarted = false;
+            scrolling = false;
+            //isCircumstantialInvert = false;
+            //pastFirstInvertThresh = false;
+
+            clearInterval(this._loopId);
+
+            //clearInterval(pointerElemChangedInterval);
+            autoscroll._nulling();
+            
+            autoscroll._clearAutoScrolls();
+            autoscroll._cancelThrottle();
+
+            clearTimeout(this._dragStartTimer);
+
+
+            if (this._cloneId) {
+                this._cloneId.stop();
+                this._cloneId = null;
+            }
+
+            if (this._dragStartId) {
+                this._dragStartId.stop();
+                this._dragStartId = null;
+            }
+
+            // Unbind events
+            ///eventer.off(document, 'mousemove', this._onTouchMove);
+
+
+
+            ///if (Safari) {
+            ///    styler.css(document.body, 'user-select', '');
+           /// }
+
+
+
+            if (this.nativeDraggable) {
+                eventer.off(dnd.dragEl, 'dragstart', this._onDragStart);
+                eventer.off(dnd.dragEl, 'dragend', this._onDragEnd);
+            }
+            dnd.end();
+            this._nulling();
+
+
+        }
+
+    });
+
+
+    return Draggable;
+
 });
 define('skylark-sortable/Sortable',[
 	"skylark-langx/skylark",
@@ -1187,7 +1873,8 @@ define('skylark-sortable/Sortable',[
 	"./autoscroll",
 	"./containers",
 	"./dnd",
-	"./ghoster"
+	"./ghoster",
+	"./Draggable"
 ],function(
 	skylark,
 	langx,
@@ -1207,42 +1894,41 @@ define('skylark-sortable/Sortable',[
 	autoscroll,
 	containers,
 	dnd,
-	ghoster
+	ghoster,
+	Draggable
 ){
-	function log(category,message) {
-		$("#console").append("<div>"+category+":"+message+"</div>");	
-	}	
 
+	'use strict';
 
 	var 
-		parentEl,
+		//parentEl,
 		//ghostEl,
 		//cloneEl,
-		rootEl,
-		nextEl,
-		lastDownEl,
+		///rootEl,
+		///nextEl,
+		//lastDownEl,
 
-		scrollEl,
+		//scrollEl,
 		//scrollParentEl,
-		scrollCustomFn,
+		//scrollCustomFn,
 
-		oldIndex,
+		//oldIndex,
 		newIndex,
-		oldDraggableIndex,
+		//oldDraggableIndex,
 		newDraggableIndex,
 
-		activeGroup,
+		///activeGroup,
 		//putSortable,
 
-		awaitingDragStarted = false,
-		ignoreNextClick = false,
+		//awaitingDragStarted = false,
+		//ignoreNextClick = false,
 		//sortables = [],
 
-		pointerElemChangedInterval,
+		//pointerElemChangedInterval,
 		lastPointerElemX,
 		lastPointerElemY,
 
-		tapEvt,
+		//tapEvt,
 		//touchEvt,
 
 		moved,
@@ -1304,16 +1990,12 @@ define('skylark-sortable/Sortable',[
 			return el.style.pointerEvents === 'auto';
 		})(),
 		*/
-		supportCssPointerEvents = browser.support.cssPointerEvents;
+		supportCssPointerEvents = browser.support.cssPointerEvents,
 
 		_silent = false,
 		_alignedSilent = false,
 
-		abs = Math.abs,
-		min = Math.min,
-		max = Math.max,
-
-		savedInputChecked = [],
+		//savedInputChecked = [],
 
 
 		_prepareGroup = function (options) {
@@ -1356,7 +2038,7 @@ define('skylark-sortable/Sortable',[
 			group.revertClone = originalGroup.revertClone;
 
 			options.group = group;
-		},
+		};
 
 
 		//_hideGhostForTarget = function() {
@@ -1372,6 +2054,7 @@ define('skylark-sortable/Sortable',[
 		//};
 
 
+	/*
 
 	// #1184 fix - Prevent click event on fallback if dragged but item not changed position
 	document.addEventListener('click', function(evt) {
@@ -1385,72 +2068,13 @@ define('skylark-sortable/Sortable',[
 	}, true);
 
 
-	function _find(ctx, tagName, iterator) {
-		if (ctx) {
-			var list = ctx.getElementsByTagName(tagName), i = 0, n = list.length;
-
-			if (iterator) {
-				for (; i < n; i++) {
-					iterator(list[i], i);
-				}
-			}
-
-			return list;
-		}
-
-		return [];
-	}
-
-
-	/**
-	 * Generate id
-	 * @param   {HTMLElement} el
-	 * @returns {String}
-	 * @private
-	 */
-	function _generateId(el) {
-		var str = el.tagName + el.className + el.src + el.href + el.textContent,
-			i = str.length,
-			sum = 0;
-
-		while (i--) {
-			sum += str.charCodeAt(i);
-		}
-
-		return sum.toString(36);
-	}
-
-
-	function _saveInputCheckedState(root) {
-		savedInputChecked.length = 0;
-
-		var inputs = root.getElementsByTagName('input');
-		var idx = inputs.length;
-
-		while (idx--) {
-			var el = inputs[idx];
-			el.checked && savedInputChecked.push(el);
-		}
-	}
-
-	function _nextTick(fn) {
-		//return setTimeout(fn, 0);
-		return langx.defer(fn);
-	}
-
-	function _cancelNextTick(id) {
-		//return clearTimeout(id);
-		return id && id.stop();
-	}
-
-
-
 	// Fixed #973:
 	eventer.on(document, 'touchmove', function(evt) {
 		if ((Sortable.active || awaitingDragStarted) && evt.cancelable) {
 			evt.preventDefault();
 		}
 	});
+	*/
 
 
 	/**
@@ -1535,25 +2159,35 @@ define('skylark-sortable/Sortable',[
 		// Setup drag mode
 		this.nativeDraggable = options.forceFallback ? false : supportDraggable;
 
-		if (this.nativeDraggable) {
-			// Touch start threshold cannot be greater than the native dragstart threshold
-			this.options.touchStartThreshold = 1;
-		}
+		///if (this.nativeDraggable) {
+		///	// Touch start threshold cannot be greater than the native dragstart threshold
+		///	this.options.touchStartThreshold = 1;
+		///}
 
 		// Bind events
-		touch.mousy(el);
+		///touch.mousy(el);
 
-		eventer.on(el, 'mousedown', this._onTapStart);
+		///eventer.on(el, 'mousedown', this._onTapStart);
+
+		this.draggable = new Draggable(this.el,langx.mixin({
+			nativeDraggable : this.nativeDraggable,
+			sortable : this
+		},this.options));
 
 		if (this.nativeDraggable) {
 			eventer.on(el, 'dragover', this);
 			eventer.on(el, 'dragenter', this);
+	        eventer.on(el, 'drop', this);
 		}
 
 		dnd.sortables.push(this.el);
 
 		// Restore sorting
 		options.store && options.store.get && this.sort(options.store.get(this) || []);
+
+
+        eventer.on(el, 'selectstart', this);
+
 	}
 
 	Sortable.prototype = /** @lends Sortable.prototype */ {
@@ -1601,308 +2235,12 @@ define('skylark-sortable/Sortable',[
 		},
 
 
-		// handle moudedown event
-		_onTapStart: function (/** Event|TouchEvent */evt) {
-			//if (!evt.cancelable) return;
-			var _this = this,
-				el = this.el,
-				options = this.options,
-				preventOnFilter = options.preventOnFilter,
-				type = evt.type,
-				touch = evt.touches && evt.touches[0],
-				target = (touch || evt).target,
-				originalTarget = evt.target.shadowRoot && ((evt.path && evt.path[0]) || (evt.composedPath && evt.composedPath()[0])) || target,
-				filter = options.filter,
-				startIndex,
-				startDraggableIndex;
 
-			_saveInputCheckedState(el);
-
-			// Don't trigger start event when an element is been dragged, otherwise the evt.oldindex always wrong when set option.group.
-			if (dnd.dragEl) {
-				return;
-			}
-
-			if (/mousedown|pointerdown/.test(type) && evt.button !== 0 || options.disabled) {
-				return; // only left button and enabled
-			}
-
-			// cancel dnd if original target is content editable
-			if (originalTarget.isContentEditable) {
-				return;
-			}
-
-			target = finder.closest(target, options.draggable, el, false);
-
-
-			if (lastDownEl === target) {
-				// Ignoring duplicate `down`
-				return;
-			}
-
-			log("_onTapStart",target.tagName+","+target.className);
-
-			// Get the index of the dragged element within its parent
-			startIndex = containers._index(target);
-			startDraggableIndex = containers._index(target, options.draggable);
-
-			// Check filter
-			if (typeof filter === 'function') {
-				if (filter.call(this, evt, target, this)) {
-					dnd._dispatchEvent(_this, originalTarget, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
-					preventOnFilter && evt.cancelable && evt.preventDefault();
-					return; // cancel dnd
-				}
-			}
-			else if (filter) {
-				filter = filter.split(',').some(function (criteria) {
-					criteria = finder.closest(originalTarget, criteria.trim(), el, false);
-
-					if (criteria) {
-						dnd._dispatchEvent(_this, criteria, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
-						return true;
-					}
-				});
-
-				if (filter) {
-					preventOnFilter && evt.cancelable && evt.preventDefault();
-					return; // cancel dnd
-				}
-			}
-
-			if (options.handle && !finder.closest(originalTarget, options.handle, el, false)) {
-				return;
-			}
-
-			// Prepare `dragstart`
-			this._prepareDragStart(evt, touch, target, startIndex, startDraggableIndex);
-		},
-
-
-		_handleAutoScroll: function(evt, fallback) {
-
-			if (!dnd.dragEl || !this.options.scroll) return;
-
-			return autoscroll._handleAutoScroll(evt,this.options,fallback);
-		},
-
-		_prepareDragStart: function (/** Event */evt, /** Touch */touch, /** HTMLElement */target, /** Number */startIndex, /** Number */startDraggableIndex) {
-			var _this = this,
-				el = _this.el,
-				options = _this.options,
-				ownerDocument = el.ownerDocument,
-				dragStartFn,
-				dragEl = dnd.dragEl;
-			log("_prepareDragStart","start");
-			if (target && !dragEl && (target.parentNode === el)) {
-				rootEl = el;
-				dragEl = dnd.dragEl = target;
-				parentEl = dragEl.parentNode;
-				nextEl = dragEl.nextSibling;
-				lastDownEl = target;
-				activeGroup = options.group;
-				oldIndex = startIndex;
-				oldDraggableIndex = startDraggableIndex;
-
-				tapEvt = {
-					target: dragEl,
-					clientX: (touch || evt).clientX,
-					clientY: (touch || evt).clientY
-				};
-
-				this._lastX = (touch || evt).clientX;
-				this._lastY = (touch || evt).clientY;
-
-				dragEl.style['will-change'] = 'all';
-				// undo animation if needed
-				dragEl.style.transition = '';
-				dragEl.style.transform = '';
-
-				dragStartFn = function () {
-					// Delayed drag has been triggered
-					// we can re-enable the events: touchmove/mousemove
-					_this._disableDelayedDragEvents();
-
-					if (!FireFox && _this.nativeDraggable) {
-						dragEl.draggable = true;
-					}
-
-					// Bind the events: dragstart/dragend
-					_this._triggerDragStart(evt, touch);
-
-					// Drag start event
-					dnd._dispatchEvent(_this, rootEl, 'choose', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex);
-
-					// Chosen item
-					styler.toggleClass(dragEl, options.chosenClass, true);
-				};
-
-				// Disable "draggable"
-				options.ignore.split(',').forEach(function (criteria) {
-					_find(dragEl, criteria.trim(), _disableDraggable);
-				});
-
-				dnd.prepare(this);
-
-				eventer.on(ownerDocument, 'mouseup', _this._onDrop);
-				///eventer.on(ownerDocument, 'touchend', _this._onDrop);
-				///eventer.on(ownerDocument, 'touchcancel', _this._onDrop);
-
-				// Make dragEl draggable (must be before delay for FireFox)
-				if (FireFox && this.nativeDraggable) {
-					this.options.touchStartThreshold = 4;
-					dragEl.draggable = true;
-				}
-
-				// Delay is impossible for native DnD in Edge or IE
-				if (options.delay && (options.delayOnTouchOnly ? touch : true) && (!this.nativeDraggable || !(Edge || IE11OrLess))) {
-					// If the user moves the pointer or let go the click or touch
-					// before the delay has been reached:
-					// disable the delayed drag
-					eventer.on(ownerDocument, 'mouseup', _this._disableDelayedDrag);
-					//eventer.on(ownerDocument, 'touchend', _this._disableDelayedDrag);
-					//eventer.on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
-					eventer.on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
-					//eventer.on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
-					//options.supportPointer && eventer.on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
-
-					_this._dragStartTimer = setTimeout(dragStartFn, options.delay);
-				} else {
-					dragStartFn();
-				}
-			}
-		},
-
-		_delayedDragTouchMoveHandler: function (/** TouchEvent|PointerEvent **/e) {
-			var touch = e.touches ? e.touches[0] : e;
-			if (max(abs(touch.clientX - this._lastX), abs(touch.clientY - this._lastY))
-					>= Math.floor(this.options.touchStartThreshold / (this.nativeDraggable && window.devicePixelRatio || 1))
-			) {
-				this._disableDelayedDrag();
-			}
-		},
-
-		_disableDelayedDrag: function () {
-			dnd.dragEl && _disableDraggable(dnd.dragEl);
-			clearTimeout(this._dragStartTimer);
-
-			this._disableDelayedDragEvents();
-		},
-
-		_disableDelayedDragEvents: function () {
-			var ownerDocument = this.el.ownerDocument;
-			eventer.off(ownerDocument, 'mouseup', this._disableDelayedDrag);
-			eventer.off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
-		},
-
-		//native dnd mode : register _OnDragStart for dragstart event handler 
-		//moused dnd mode : register  _onTouchMove for mousemove event hander, _onTouchMove calls _OnDragStart
-		_triggerDragStart: function (/** Event */evt, /** Touch */touch) {
-			log("_triggerDragStart","start");
-			log("_triggerDragStart","nativeDraggable is " +  this.nativeDraggable);
-			if (!this.nativeDraggable) {
-				eventer.on(document, 'mousemove', this._onTouchMove);
-			} else {
-				eventer.on(dnd.dragEl, 'dragend', this);
-				eventer.on(rootEl, 'dragstart', this._onDragStart);
-			}
-
-			try {
-				if (document.selection) {
-					// Timeout neccessary for IE9
-					_nextTick(function () {
-						document.selection.empty();
-					});
-				} else {
-					window.getSelection().removeAllRanges();
-				}
-			} catch (err) {
-			}
-		},
-
-		//
-		//
-		_dragStarted: function (fallback, evt) {
-			awaitingDragStarted = false;
-			var dragEl = dnd.dragEl;
-
-			if (rootEl && dragEl) {
-				if (this.nativeDraggable) {
-					eventer.on(document, 'dragover', this._handleAutoScroll);
-					eventer.on(document, 'dragover', dnd._checkAlignment);
-				}
-				var options = this.options;
-
-				// Apply effect
-				!fallback && styler.toggleClass(dragEl, options.dragClass, false);
-				styler.toggleClass(dragEl, options.ghostClass, true);
-
-				// In case dragging an animated element
-				styler.css(dragEl, 'transform', '');
-
-				dnd.active = this;
-
-				fallback && this._appendGhost();
-
-				// Drag start event
-				dnd._dispatchEvent(this, rootEl, 'start', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex, undefined, evt);
-			} else {
-				this._nulling();
-			}
-		},
-
-
-		_onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
-			log("_onTouchMove","start");
-			var ghostEl = ghoster.ghostEl;
-			if (tapEvt) {
-				var	options = this.options,
-					fallbackTolerance = options.fallbackTolerance,
-					fallbackOffset = options.fallbackOffset,
-					touch = evt.touches ? evt.touches[0] : evt,
-					matrix = ghostEl && transforms.matrix(ghostEl),
-					scaleX = ghostEl && matrix && matrix.a,
-					scaleY = ghostEl && matrix && matrix.d,
-					relativeScrollOffset = ghoster.getRelativeScrollOffset(),
-					dx = ((touch.clientX - tapEvt.clientX)
-							+ fallbackOffset.x) / (scaleX || 1)
-							+ (relativeScrollOffset ? (relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0]) : 0) / (scaleX || 1),
-					dy = ((touch.clientY - tapEvt.clientY)
-							+ fallbackOffset.y) / (scaleY || 1)
-							+ (relativeScrollOffset ? (relativeScrollOffset[1] - ghostRelativeParentInitialScroll[1]) : 0) / (scaleY || 1),
-					translate3d = evt.touches ? 'translate3d(' + dx + 'px,' + dy + 'px,0)' : 'translate(' + dx + 'px,' + dy + 'px)';
-
-				// only set the status to dragging, when we are actually dragging
-				if (!dnd.active && !awaitingDragStarted) {
-					if (fallbackTolerance &&
-						min(abs(touch.clientX - this._lastX), abs(touch.clientY - this._lastY)) < fallbackTolerance
-					) {
-						return;
-					}
-					this._onDragStart(evt, true);
-				}
-
-				!forAutoScroll && this._handleAutoScroll(touch, true);
-
-				moved = true;
-				dnd.touchEvt = touch;
-
-				if (ghostEl) {
-					styler.css(ghostEl, 'webkitTransform', translate3d);
-					styler.css(ghostEl, 'mozTransform', translate3d);
-					styler.css(ghostEl, 'msTransform', translate3d);
-					styler.css(ghostEl, 'transform', translate3d);
-
-				}
-
-				//evt.cancelable && evt.preventDefault();
-				evt.preventDefault()
-			}
-		},
 
 		_appendGhost: function () {
 			// Bug if using scale(): https://stackoverflow.com/questions/2637058
 			// Not being adjusted for
+			var rootEl = dnd.draggable.elm();
 			var container = this.options.fallbackOnBody ? document.body : rootEl;
 			return ghoster._appendGhost(dnd.dragEl,container,this.options);
 		},
@@ -1967,65 +2305,6 @@ define('skylark-sortable/Sortable',[
 			eventer.off(document, 'selectstart', this);
 		},
 
-		_onDragStart: function (/**Event*/evt, /**boolean*/fallback) {
-			var _this = this,
-				dragEl = dnd.dragEl;
-
-			var dataTransfer = evt.dataTransfer;
-			var options = _this.options;
-
-			// Setup clone
-			var cloneEl = dnd.cloneEl = noder.clone(dragEl,true);
-
-			cloneEl.draggable = false;
-			cloneEl.style['will-change'] = '';
-
-			this._hideClone();
-
-			styler.toggleClass(cloneEl, _this.options.chosenClass, false);
-
-
-			// #1143: IFrame support workaround
-			_this._cloneId = _nextTick(function () {
-				if (!_this.options.removeCloneOnHide) {
-					rootEl.insertBefore(cloneEl, dragEl);
-				}
-				dnd._dispatchEvent(_this, rootEl, 'clone', dragEl);
-			});
-
-
-			!fallback && styler.toggleClass(dragEl, options.dragClass, true);
-
-			// Set proper drop events
-			if (fallback) {
-				ignoreNextClick = true;
-				_this._loopId = setInterval(dnd._emulateDragOver.bind(dnd), 50);
-			} else {
-				// Undo what was set in _prepareDragStart before drag started
-				eventer.off(document, 'mouseup', _this._onDrop);
-				///eventer.off(document, 'touchend', _this._onDrop);
-				///eventer.off(document, 'touchcancel', _this._onDrop);
-
-				if (dataTransfer) {
-					dataTransfer.effectAllowed = 'move';
-					options.setData && options.setData.call(_this, dataTransfer, dragEl);
-				}
-
-				eventer.on(document, 'drop', _this);
-
-				// #1276 fix:
-				styler.css(dragEl, 'transform', 'translateZ(0)');
-			}
-
-			awaitingDragStarted = true;
-
-			_this._dragStartId = _nextTick(_this._dragStarted.bind(_this, fallback, evt));
-			eventer.on(document, 'selectstart', _this);
-			if (Safari) {
-				styler.css(document.body, 'user-select', 'none');
-			}
-		},
-
 
 		// Returns true - if no further action is needed (either inserted or another condition)
 		_onDragOver: function (/**Event*/evt) {
@@ -2037,11 +2316,16 @@ define('skylark-sortable/Sortable',[
 				options = this.options,
 				group = options.group,
 				activeSortable = dnd.active,
-				isOwner = (activeGroup === group),
+				isOwner = (dnd.activeGroup === group),
 				canSort = options.sort,
 				_this = this,
 				dragEl = dnd.dragEl,
-				putSortable = dnd.putSortable;
+				rootEl = dnd.draggable.elm(),
+				putSortable = dnd.putSortable,
+				nextEl = dnd.nextEl,
+				oldIndex = dnd.oldIndex,
+				oldDraggableIndex = dnd.oldDraggableIndex;
+            //dnd.log("_onDragOver","start");
 
 			if (_silent) return;
 
@@ -2049,9 +2333,9 @@ define('skylark-sortable/Sortable',[
 			function completed(insertion) {
 				if (insertion) {
 					if (isOwner) {
-						activeSortable._hideClone();
+						activeSortable.draggable._hideClone();
 					} else {
-						activeSortable._showClone(_this);
+						activeSortable.draggable._showClone(_this);
 					}
 
 					if (activeSortable) {
@@ -2079,7 +2363,8 @@ define('skylark-sortable/Sortable',[
 
 				// no bubbling and not fallback
 				if (!options.dragoverBubble && !evt.rootEl && target !== document) {
-					_this._handleAutoScroll(evt);
+					//_this._handleAutoScroll(evt);
+					dnd.over(evt);
 					dragEl.parentNode[dnd.expando]._computeIsAligned(evt);
 
 					// Do not detect for empty insert if already inserted
@@ -2205,7 +2490,7 @@ define('skylark-sortable/Sortable',[
 			}
 
 			if (target !== dragEl) {
-				ignoreNextClick = false;
+				dnd.ignoreNextClick = false;
 			}
 
 			if (activeSortable && !options.disabled &&
@@ -2214,7 +2499,7 @@ define('skylark-sortable/Sortable',[
 					: (
 						putSortable === this ||
 						(
-							(this.lastPutMode = activeGroup.checkPull(this, activeSortable, dragEl, evt)) &&
+							(this.lastPutMode = dnd.activeGroup.checkPull(this, activeSortable, dragEl, evt)) &&
 							group.checkPut(this, activeSortable, dragEl, evt)
 						)
 					)
@@ -2226,7 +2511,7 @@ define('skylark-sortable/Sortable',[
 
 				if (revert) {
 					this._hideClone();
-					parentEl = rootEl; // actualization
+					dnd.parentEl = rootEl; // actualization
 
 					if (nextEl) {
 						rootEl.insertBefore(dragEl, nextEl);
@@ -2250,14 +2535,14 @@ define('skylark-sortable/Sortable',[
 					}
 
 					if (isOwner) {
-						activeSortable._hideClone();
+						activeSortable.draggable._hideClone();
 					} else {
-						activeSortable._showClone(this);
+						activeSortable.draggable._showClone(this);
 					}
 
 					if (dnd._onMove(rootEl, el, dragEl, dragRect, target, targetRect, evt, !!target) !== false) {
 						el.appendChild(dragEl);
-						parentEl = el; // actualization
+						dnd.parentEl = el; // actualization
 						realDragElRect = null;
 
 						changed();
@@ -2331,9 +2616,9 @@ define('skylark-sortable/Sortable',[
 						setTimeout(_unsilent, 30);
 
 						if (isOwner) {
-							activeSortable._hideClone();
+							activeSortable.draggable._hideClone();
 						} else {
-							activeSortable._showClone(this);
+							activeSortable.draggable._showClone(this);
 						}
 
 						if (after && !nextSibling) {
@@ -2347,11 +2632,11 @@ define('skylark-sortable/Sortable',[
 							geom.scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
 						}
 
-						parentEl = dragEl.parentNode; // actualization
+						dnd.parentEl = dragEl.parentNode; // actualization
 
 						// must be done before animation
 						if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
-							targetMoveDistance = abs(targetBeforeFirstSwap - geom.boundingRect(target)[side1]);
+							targetMoveDistance =  Math.abs(targetBeforeFirstSwap - geom.boundingRect(target)[side1]);
 						}
 						changed();
 
@@ -2370,13 +2655,17 @@ define('skylark-sortable/Sortable',[
 		_onDrop: function (/**Event*/evt) {
 			var el = this.el,
 				options = this.options,
+				rootEl = dnd.draggable.elm(),
 				dragEl = dnd.dragEl,
-				putSortable = dnd.putSortable;
+				putSortable = dnd.putSortable,
+				parentEl = dnd.parentEl,
+				oldIndex = dnd.oldIndex,
+				oldDraggableIndex = dnd.oldDraggableIndex,
+				nextEl = dnd.nextEl;
 
+			/*
 			awaitingDragStarted = false;
 			scrolling = false;
-			isCircumstantialInvert = false;
-			pastFirstInvertThresh = false;
 
 			clearInterval(this._loopId);
 
@@ -2389,21 +2678,24 @@ define('skylark-sortable/Sortable',[
 
 			_cancelNextTick(this._cloneId);
 			_cancelNextTick(this._dragStartId);
+			*/
 
+			isCircumstantialInvert = false;
+			pastFirstInvertThresh = false;
 			// Unbind events
-			eventer.off(document, 'mousemove', this._onTouchMove);
+			//eventer.off(document, 'mousemove', this._onTouchMove);
 
 
 			if (this.nativeDraggable) {
 				eventer.off(document, 'drop', this);
-				eventer.off(el, 'dragstart', this._onDragStart);
-				eventer.off(document, 'dragover', this._handleAutoScroll);
-				eventer.off(document, 'dragover', dnd._checkAlignment);
+				///eventer.off(el, 'dragstart', this._onDragStart);
+				//eventer.off(document, 'dragover', this._handleAutoScroll);
+				//eventer.off(document, 'dragover', dnd._checkAlignment);
 			}
 
-			if (Safari) {
-				styler.css(document.body, 'user-select', '');
-			}
+			///if (Safari) {
+			///	styler.css(document.body, 'user-select', '');
+			///}
 
 			this._offMoveEvents();
 			this._offUpEvents();
@@ -2414,7 +2706,7 @@ define('skylark-sortable/Sortable',[
 					!options.dropBubble && evt.stopPropagation();
 				}
 
-				ghoster.ghostEl && ghoster.ghostEl.parentNode && ghoster.ghostEl.parentNode.removeChild(ghoster.ghostEl);
+				ghoster.remove();
 
 				if (rootEl === parentEl || (putSortable && putSortable.lastPutMode !== 'clone')) {
 					// Remove clone
@@ -2422,14 +2714,14 @@ define('skylark-sortable/Sortable',[
 				}
 
 				if (dragEl) {
-					if (this.nativeDraggable) {
-						eventer.off(dragEl, 'dragend', this);
-					}
+					///if (this.nativeDraggable) {
+					///	eventer.off(dragEl, 'dragend', this);
+					///}
 
-					_disableDraggable(dragEl);
+					dnd._disableDraggable(dragEl);
 					dragEl.style['will-change'] = '';
 
-					// Remove class's
+					// Remove class'sd
 					styler.toggleClass(dragEl, putSortable ? putSortable.options.ghostClass : this.options.ghostClass, false);
 					styler.toggleClass(dragEl, this.options.chosenClass, false);
 
@@ -2486,49 +2778,45 @@ define('skylark-sortable/Sortable',[
 		},
 
 		_nulling: function() {
-			rootEl =
+			/*
+			dnd.rootEl =
 			dnd.dragEl =
-			parentEl =
+			dnd.parentEl =
 			ghoster.ghostEl =
-			nextEl =
+			dnd.nextEl =
 			dnd.cloneEl =
-			lastDownEl =
+			///lastDownEl =
 
-			scrollEl =
+			autoscroll.scrollEl =
 			autoscroll.scrollParentEl =
 			autoscroll.autoScrolls.length =
-
-			pointerElemChangedInterval =
+			*/
+			//pointerElemChangedInterval =
 			lastPointerElemX =
 			lastPointerElemY =
 
-			tapEvt =
-			dnd.touchEvt =
+			//tapEvt =
+			//dnd.touchEvt =
 
 			moved =
 			newIndex =
-			oldIndex =
+			//dnd.oldIndex =
 
 			lastTarget =
 			lastDirection =
 
 			realDragElRect =
 
-			dnd.putSortable =
-			activeGroup =
-			dnd.active = null;
+			//dnd.putSortable =
+			//dnd.activeGroup =
+			//dnd.active = 
+			null;
 
-			savedInputChecked.forEach(function (el) {
-				el.checked = true;
-			});
-
-			savedInputChecked.length = 0;
 		},
 
 		handleEvent: function (/**Event*/evt) {
 			switch (evt.type) {
 				case 'drop':
-				case 'dragend':
 					this._onDrop(evt);
 					break;
 
@@ -2562,7 +2850,7 @@ define('skylark-sortable/Sortable',[
 			for (; i < n; i++) {
 				el = children[i];
 				if (finder.closest(el, options.draggable, this.el, false)) {
-					order.push(el.getAttribute(options.dataIdAttr) || _generateId(el));
+					order.push(el.getAttribute(options.dataIdAttr) || noder.generateId(el));
 				}
 			}
 
@@ -2659,41 +2947,6 @@ define('skylark-sortable/Sortable',[
 			dnd.sortables.splice(dnd.sortables.indexOf(this.el), 1);
 
 			this.el = el = null;
-		},
-
-		_hideClone: function() {
-			if (!dnd.cloneEl.cloneHidden) {
-				styler.css(dnd.cloneEl, 'display', 'none');
-				dnd.cloneEl.cloneHidden = true;
-				if (dnd.cloneEl.parentNode && this.options.removeCloneOnHide) {
-					dnd.cloneEl.parentNode.removeChild(dnd.cloneEl);
-				}
-			}
-		},
-
-		_showClone: function(putSortable) {
-
-			if (putSortable.lastPutMode !== 'clone') {
-				this._hideClone();
-				return;
-			}
-
-			if (dnd.cloneEl.cloneHidden) {
-				// show clone at dragEl or original position
-				if (rootEl.contains(dnd.dragEl) && !this.options.group.revertClone) {
-					rootEl.insertBefore(dnd.cloneEl, dnd.dragEl);
-				} else if (nextEl) {
-					rootEl.insertBefore(dnd.cloneEl, nextEl);
-				} else {
-					rootEl.appendChild(dnd.cloneEl);
-				}
-
-				if (this.options.group.revertClone) {
-					this._animate(dnd.dragEl, dnd.cloneEl);
-				}
-				styler.css(dnd.cloneEl, 'display', '');
-				dnd.cloneEl.cloneHidden = false;
-			}
 		}
 	};
 
@@ -2705,9 +2958,6 @@ define('skylark-sortable/Sortable',[
 		evt.cancelable && evt.preventDefault();
 	}
 
-	function _disableDraggable(el) {
-		el.draggable = false;
-	}
 
 	function _unsilent() {
 		_silent = false;
@@ -2766,8 +3016,14 @@ define('skylark-sortable/main',[
 					return noder.clone(el,true);
 				},
 		index: containers._index,
-		///nextTick: _nextTick,
-		///cancelNextTick: _cancelNextTick,
+		nextTick: 	function _nextTick(fn) {
+			//return setTimeout(fn, 0);
+			return langx.defer(fn);
+		},
+		cancelNextTick: 	function _cancelNextTick(id) {
+			//return clearTimeout(id);
+			return id && id.stop();
+		},
 		//detectDirection: _detectDirection,
 		getChild: function(el, childNum, options) {
 			options.excluding = [];

@@ -35,6 +35,8 @@ define([
 	autoscroll,
 	dnd
 ){
+    'use strict';
+
 	var
 		/**
 		 * Returns the index of an element within its parent for a selected set of

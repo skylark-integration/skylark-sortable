@@ -34,8 +34,14 @@ define([
 					return noder.clone(el,true);
 				},
 		index: containers._index,
-		///nextTick: _nextTick,
-		///cancelNextTick: _cancelNextTick,
+		nextTick: 	function _nextTick(fn) {
+			//return setTimeout(fn, 0);
+			return langx.defer(fn);
+		},
+		cancelNextTick: 	function _cancelNextTick(id) {
+			//return clearTimeout(id);
+			return id && id.stop();
+		},
 		//detectDirection: _detectDirection,
 		getChild: function(el, childNum, options) {
 			options.excluding = [];

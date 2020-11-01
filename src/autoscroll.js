@@ -3,18 +3,22 @@ define([
 	"skylark-langx-hoster/isBrowser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
-	"skylark-domx-scrolls/scrollingElement",
-	"./dnd"
+	"skylark-domx-scrolls/scrollingElement"
 ],function(
 	langx,
 	isBrowser,
 	geom,
 	styler,
-	scrollingElement,
-	dnd
+	scrollingElement
 ){
+    'use strict';
+
 	var autoScrolls = [],
 		scrolling = false,
+		scrollEl,
+		scrollCustomFn,
+		pointerElemChangedInterval,
+
 		scrollParentEl = null;
 
 	var
@@ -107,10 +111,10 @@ define([
 	},
 
 
-	_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback) {
+	_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback,expando) {
 		// Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
 		if (options.scroll) {
-			var _this = rootEl ? rootEl[dnd.expando] : window,
+			var _this = rootEl ? rootEl[expando] : window,
 				sens = options.scrollSensitivity,
 				speed = options.scrollSpeed,
 
@@ -301,6 +305,11 @@ define([
 	}
 
 	
+	function _nulling() {
+		pointerElemChangedInterval && clearInterval(pointerElemChangedInterval);
+		pointerElemChangedInterval = null;
+
+	}
 	return {
 		autoScrolls,
 		
@@ -312,6 +321,7 @@ define([
 		_handleAutoScroll,
 
 		_throttle,
-		_cancelThrottle
+		_cancelThrottle,
+		_nulling
 	}
 });

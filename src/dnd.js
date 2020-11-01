@@ -13,7 +13,9 @@ define([
 	"skylark-domx-transforms",
 	"skylark-domx-scrolls/scrollingElement",
 	"skylark-domx-layouts/oriented",
-	"skylark-devices-points/touch"
+	"skylark-devices-points/touch",
+	"./autoscroll",
+	"./ghoster"
 ],function(
 	skylark,
 	langx,
@@ -29,15 +31,24 @@ define([
 	transforms,
 	scrollingElement,
 	oriented,
-	touch
+	touch,
+	autoscroll,
+	ghoster
 ){
+    'use strict';
+
 
 	var expando = 'Sortable' + (new Date).getTime();
 
 
 	var dnd = {
+		log : function log(category,message) {
+			$("#console").append("<div>"+category+":"+message+"</div>");	
+		},
+
 		expando,
 
+		activeGroup : null,
 		active : null,
 		putSortable : null,
 		sortables : [],
@@ -46,10 +57,15 @@ define([
 		dragEl : null,
 		cloneEl : null,
 
+		ignoreNextClick : false,
+        awaitingDragStarted : false,
+
+
 		touchEvt : null,
 
         prepare: function(draggable) {
-			var el = draggable.el,
+        	this.draggable = draggable;
+			var el = draggable.elm(),
 				ownerDocument = el.ownerDocument;
 
 			eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
@@ -58,13 +74,31 @@ define([
 		},
 
         start: function(draggable, event) {
+            if (this.draggable.nativeDraggable) {
+                eventer.on(document, 'dragover', this._handleAutoScroll);
+                eventer.on(document, 'dragover', this._checkAlignment);
+            } else {
+                eventer.on(document, 'mousemove', this._onTouchMove);
+            }
         },
 
-        over : function() {
-
+        over : function(evt) {
+			this._handleAutoScroll(evt);
         },
 
         end: function(dropped) {
+			if (this.draggable.nativeDraggable) {
+				eventer.off(document, 'dragover', this._handleAutoScroll);
+				eventer.off(document, 'dragover', this._checkAlignment);
+			} else {
+		        // Unbind events
+	            eventer.off(document, 'mousemove', this._onTouchMove);
+
+			}
+
+        	this.draggable = null;
+
+        	this._nulling();
  		},
 
 		nearestEmptyInsertDetectEvent :function (evt) {
@@ -223,7 +257,94 @@ define([
 			if (options[onName]) {
 				options[onName].call(sortable, evt);
 			}
-		}
+		},
+
+		_disableDraggable : function (el) {
+			el.draggable = false;
+		},
+
+		_handleAutoScroll: function(evt, fallback) {
+
+			if (!dnd.dragEl || !dnd.draggable.options.scroll) return;
+
+			return autoscroll._handleAutoScroll(evt,dnd.draggable.options,fallback);
+		},
+
+        _onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
+            dnd.log("_onTouchMove","start");
+            var ghostEl = ghoster.ghostEl,
+            	draggable = dnd.draggable;
+            if (tapEvt) {
+                var options =  draggable.options,
+                    fallbackTolerance = options.fallbackTolerance,
+                    fallbackOffset = options.fallbackOffset,
+                    touch = evt.touches ? evt.touches[0] : evt,
+                    matrix = ghostEl && transforms.matrix(ghostEl),
+                    scaleX = ghostEl && matrix && matrix.a,
+                    scaleY = ghostEl && matrix && matrix.d,
+                    relativeScrollOffset = ghoster.getRelativeScrollOffset(),
+                    dx = ((touch.clientX - tapEvt.clientX)
+                            + fallbackOffset.x) / (scaleX || 1)
+                            + (relativeScrollOffset ? (relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0]) : 0) / (scaleX || 1),
+                    dy = ((touch.clientY - tapEvt.clientY)
+                            + fallbackOffset.y) / (scaleY || 1)
+                            + (relativeScrollOffset ? (relativeScrollOffset[1] - ghostRelativeParentInitialScroll[1]) : 0) / (scaleY || 1),
+                    translate3d = evt.touches ? 'translate3d(' + dx + 'px,' + dy + 'px,0)' : 'translate(' + dx + 'px,' + dy + 'px)';
+
+                // only set the status to dragging, when we are actually dragging
+                if (!dnd.active && !dnd.awaitingDragStarted) {
+                    if (fallbackTolerance &&
+                        Math.min( Math.abs(touch.clientX - draggable._lastX),  Math.abs(touch.clientY - draggable._lastY)) < fallbackTolerance
+                    ) {
+                        return;
+                    }
+                    draggable._onDragStart(evt, true);
+                }
+
+                !forAutoScroll && dnd._handleAutoScroll(touch, true);
+
+                moved = true;
+                dnd.touchEvt = touch;
+
+                if (ghostEl) {
+                    //styler.css(ghostEl, 'webkitTransform', translate3d);
+                    //styler.css(ghostEl, 'mozTransform', translate3d);
+                    //styler.css(ghostEl, 'msTransform', translate3d);
+                    styler.css(ghostEl, 'transform', translate3d);
+
+                }
+
+                //evt.cancelable && evt.preventDefault();
+                evt.preventDefault()
+            }
+        },
+
+		_nulling: function() {
+
+			dnd.rootEl =
+			dnd.dragEl =
+			dnd.parentEl =
+			ghoster.ghostEl =
+			dnd.nextEl =
+			dnd.cloneEl =
+			///lastDownEl =
+
+			autoscroll.scrollEl =
+			autoscroll.scrollParentEl =
+			autoscroll.autoScrolls.length =
+
+
+			//tapEvt =
+			dnd.touchEvt =
+
+			dnd.oldIndex =
+
+			dnd.putSortable =
+			dnd.activeGroup =
+			dnd.active = null;
+
+		},
+
 
 	};
 

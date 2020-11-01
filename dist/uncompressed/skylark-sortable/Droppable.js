@@ -18,6 +18,12 @@ define([
 
         _construct: function(elm, options) {
             this.overrided(elm,options);
+
+            if (this.nativeDraggable) {
+                eventer.on(el, 'dragover', this);
+                eventer.on(el, 'dragenter', this);
+            }
+        
         }
     });
 

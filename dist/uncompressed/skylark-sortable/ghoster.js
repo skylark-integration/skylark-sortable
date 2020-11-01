@@ -31,7 +31,9 @@ define([
 	oriented,
 	touch
 ){
-		/**
+    'use strict';
+
+	/**
 	 * Returns the "bounding client rect" of given element
 	 * @param  {HTMLElement} el                The element whose boundingClientRect is wanted
 	 * @param  {[HTMLElement]} container       the parent the element will be placed in
@@ -193,7 +195,14 @@ define([
 
 		getRelativeScrollOffset : function(){
 			return this.PositionGhostAbsolutely && this.ghostRelativeParent && autoscroll._getRelativeScrollOffset(this.ghostRelativeParent);
-		}  
+		},
+
+		remove : function() {
+			if (this.ghostEl) {
+				noder.remove(this.ghostEl);
+			} 
+
+		}
 
 
 	};
