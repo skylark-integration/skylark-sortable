@@ -178,6 +178,7 @@ define([
 				styler.toggleClass(ghostEl, options.fallbackClass, true);
 				styler.toggleClass(ghostEl, options.dragClass, true);
 
+				/*
 				styler.css(ghostEl, 'box-sizing', 'border-box');
 				styler.css(ghostEl, 'margin', 0);
 				styler.css(ghostEl, 'top', rect.top);
@@ -188,7 +189,20 @@ define([
 				styler.css(ghostEl, 'position', (this.PositionGhostAbsolutely ? 'absolute' : 'fixed'));
 				styler.css(ghostEl, 'zIndex', '100000');
 				styler.css(ghostEl, 'pointerEvents', 'none');
+				*/
 
+				styler.css(ghostEl, {
+					'box-sizing': 'border-box',
+					'margin': 0,
+					'top': rect.top,
+					'left': rect.left,
+					'width': rect.width,
+					'height': rect.height,
+					'opacity': '0.8',
+					'position': (this.PositionGhostAbsolutely ? 'absolute' : 'fixed'),
+					'zIndex': '100000',
+					'pointerEvents': 'none'	
+				});
 				container.appendChild(ghostEl);
 			}
 		},
@@ -201,6 +215,7 @@ define([
 			if (this.ghostEl) {
 				noder.remove(this.ghostEl);
 			} 
+			this.ghostEl = null;
 
 		}
 

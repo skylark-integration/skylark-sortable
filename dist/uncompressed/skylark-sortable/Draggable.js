@@ -46,7 +46,6 @@ define([
 
     var 
         lastDownEl,
-        tapEvt,
         scrolling,
 
         savedInputChecked = [];
@@ -88,7 +87,9 @@ define([
         pluginName : "intg.sortable.draggable",
 
         options : {
-            draggingClass : "dragging"
+            draggingClass : "dragging",
+            chosenClass : null
+
         },
 
         _construct: function(elm, options) {
@@ -207,7 +208,8 @@ define([
                 parentEl = dnd.parentEl,
                 nextEl = dnd.nextEl,
                 oldIndex = dnd.oldIndex,
-                oldDraggableIndex = dnd.oldDraggableIndex;
+                oldDraggableIndex = dnd.oldDraggableIndex,
+                tapEvt = dnd.tapEvt;
 
             dnd.log("_prepareDragStart","start");
             if (target && !dragEl && (target.parentNode === el)) {
@@ -220,7 +222,7 @@ define([
                 oldIndex = dnd.oldIndex = startIndex;
                 oldDraggableIndex = dnd.oldDraggableIndex =  startDraggableIndex;
 
-                tapEvt = {
+                tapEvt = dnd.tapEvt = {
                     target: dragEl,
                     clientX: (touch || evt).clientX,
                     clientY: (touch || evt).clientY
@@ -235,10 +237,6 @@ define([
                 dragEl.style.transform = '';
 
                 dragStartFn = function () {
-                    // Delayed drag has been triggered
-                    // we can re-enable the events: touchmove/mousemove
-                    _this._disableDelayedDragEvents();
-
                     if ( _this.nativeDraggable) {
                         dragEl.draggable = true;
                     }
@@ -269,45 +267,8 @@ define([
                     dragEl.draggable = true;
                 }
 
-                // Delay is impossible for native DnD in Edge or IE
-                if (options.delay && (options.delayOnTouchOnly ? touch : true) && (!this.nativeDraggable || !(Edge || IE11OrLess))) {
-                    // If the user moves the pointer or let go the click or touch
-                    // before the delay has been reached:
-                    // disable the delayed drag
-                    eventer.on(ownerDocument, 'mouseup', _this._disableDelayedDrag);
-                    //eventer.on(ownerDocument, 'touchend', _this._disableDelayedDrag);
-                    //eventer.on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
-                    eventer.on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
-                    //eventer.on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
-                    //options.supportPointer && eventer.on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
-
-                    _this._dragStartTimer = setTimeout(dragStartFn, options.delay);
-                } else {
-                    dragStartFn();
-                }
+                dragStartFn();
             }
-        },
-
-        _delayedDragTouchMoveHandler: function (/** TouchEvent|PointerEvent **/e) {
-            var touch = e.touches ? e.touches[0] : e;
-            if (Math.max( Math.abs(touch.clientX - this._lastX),  Math.abs(touch.clientY - this._lastY))
-                    >= Math.floor(this.options.touchStartThreshold / (this.nativeDraggable && window.devicePixelRatio || 1))
-            ) {
-                this._disableDelayedDrag();
-            }
-        },
-
-        _disableDelayedDrag: function () {
-            dnd.dragEl && dnd._disableDraggable(dnd.dragEl);
-            clearTimeout(this._dragStartTimer);
-
-            this._disableDelayedDragEvents();
-        },
-
-        _disableDelayedDragEvents: function () {
-            var ownerDocument = this._elm.ownerDocument;
-            eventer.off(ownerDocument, 'mouseup', this._disableDelayedDrag);
-            eventer.off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
         },
 
         //native dnd mode : register _OnDragStart for dragstart event handler 
@@ -433,9 +394,18 @@ define([
             }
         },
 
+        _appendGhost: function () {
+            // Bug if using scale(): https://stackoverflow.com/questions/2637058
+            // Not being adjusted for
+            var rootEl =  this.elm();
+            var container = this.options.fallbackOnBody ? document.body : rootEl;
+            return ghoster._appendGhost(dnd.dragEl,container,this.options);
+        },
+
+
+
         _nulling: function() {
             lastDownEl = null;
-            tapEvt = null;
 
             savedInputChecked.forEach(function (el) {
                 el.checked = true;
@@ -451,7 +421,7 @@ define([
                 styler.hide(dnd.cloneEl);
                 dnd.cloneEl.cloneHidden = true;
                 if (dnd.cloneEl.parentNode && this.options.removeCloneOnHide) {
-                    dnd.cloneEl.parentNode.removeChild(dnd.cloneEl);
+                    noder.remove(dnd.cloneEl);
                 }
             }
         },
@@ -532,7 +502,6 @@ define([
             }
             dnd.end();
             this._nulling();
-
 
         }
 

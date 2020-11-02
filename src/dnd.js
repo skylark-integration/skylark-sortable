@@ -65,16 +65,35 @@ define([
 
         prepare: function(draggable) {
         	this.draggable = draggable;
+            if (!draggable.nativeDraggable) {
+                eventer.on(document, 'mousemove', this._onTouchMove);
+                eventer.on(document, 'mouseup',function(evt){
+                	eventer.off(document,'mousemove', this._onTouchMove);
+                	if (dnd.putSortable) {
+                		dnd.putSortable._onDrop(evt)
+                	}
+                	if (dnd.draggable) {
+                		dnd.draggable._onDragEnd(evt);
+                	}
+                	ghoster.remove();
+                })
+            }
+
+		},
+
+        start: function(draggable, event) {
+        	this.draggable = draggable;
+
+
 			var el = draggable.elm(),
 				ownerDocument = el.ownerDocument;
+
 
 			eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
 			eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
 			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
-		},
 
-        start: function(draggable, event) {
-            if (this.draggable.nativeDraggable) {
+			if (this.draggable.nativeDraggable) {
                 eventer.on(document, 'dragover', this._handleAutoScroll);
                 eventer.on(document, 'dragover', this._checkAlignment);
             } else {
@@ -87,6 +106,9 @@ define([
         },
 
         end: function(dropped) {
+	  		eventer.off(document, 'dragover', this.nearestEmptyInsertDetectEvent);
+	  		eventer.off(document, 'mousemove', this.nearestEmptyInsertDetectEvent);
+	
 			if (this.draggable.nativeDraggable) {
 				eventer.off(document, 'dragover', this._handleAutoScroll);
 				eventer.off(document, 'dragover', this._checkAlignment);
@@ -271,9 +293,10 @@ define([
 		},
 
         _onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
-            dnd.log("_onTouchMove","start");
+            //dnd.log("_onTouchMove","start");
             var ghostEl = ghoster.ghostEl,
-            	draggable = dnd.draggable;
+            	draggable = dnd.draggable,
+            	tapEvt = dnd.tapEvt;
             if (tapEvt) {
                 var options =  draggable.options,
                     fallbackTolerance = options.fallbackTolerance,
@@ -303,7 +326,7 @@ define([
 
                 !forAutoScroll && dnd._handleAutoScroll(touch, true);
 
-                moved = true;
+                ///moved = true;
                 dnd.touchEvt = touch;
 
                 if (ghostEl) {
@@ -324,7 +347,7 @@ define([
 			dnd.rootEl =
 			dnd.dragEl =
 			dnd.parentEl =
-			ghoster.ghostEl =
+			//ghoster.ghostEl =
 			dnd.nextEl =
 			dnd.cloneEl =
 			///lastDownEl =
@@ -334,7 +357,7 @@ define([
 			autoscroll.autoScrolls.length =
 
 
-			//tapEvt =
+			dnd.tapEvt =
 			dnd.touchEvt =
 
 			dnd.oldIndex =

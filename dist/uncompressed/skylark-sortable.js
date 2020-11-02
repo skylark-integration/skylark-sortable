@@ -448,9 +448,9 @@ define('skylark-sortable/autoscroll',[
 					canScrollY = height < scrollHeight && (css.overflowY === 'auto' || css.overflowY === 'scroll');
 				}
 
-				vx = canScrollX && (abs(right - x) <= sens && (scrollPosX + width) < scrollWidth) - (abs(left - x) <= sens && !!scrollPosX);
+				vx = canScrollX && (Math.abs(right - x) <= sens && (scrollPosX + width) < scrollWidth) - (Math.abs(left - x) <= sens && !!scrollPosX);
 
-				vy = canScrollY && (abs(bottom - y) <= sens && (scrollPosY + height) < scrollHeight) - (abs(top - y) <= sens && !!scrollPosY);
+				vy = canScrollY && (Math.abs(bottom - y) <= sens && (scrollPosY + height) < scrollHeight) - (Math.abs(top - y) <= sens && !!scrollPosY);
 
 
 				if (!autoScrolls[layersOut]) {
@@ -831,6 +831,7 @@ define('skylark-sortable/ghoster',[
 				styler.toggleClass(ghostEl, options.fallbackClass, true);
 				styler.toggleClass(ghostEl, options.dragClass, true);
 
+				/*
 				styler.css(ghostEl, 'box-sizing', 'border-box');
 				styler.css(ghostEl, 'margin', 0);
 				styler.css(ghostEl, 'top', rect.top);
@@ -841,7 +842,20 @@ define('skylark-sortable/ghoster',[
 				styler.css(ghostEl, 'position', (this.PositionGhostAbsolutely ? 'absolute' : 'fixed'));
 				styler.css(ghostEl, 'zIndex', '100000');
 				styler.css(ghostEl, 'pointerEvents', 'none');
+				*/
 
+				styler.css(ghostEl, {
+					'box-sizing': 'border-box',
+					'margin': 0,
+					'top': rect.top,
+					'left': rect.left,
+					'width': rect.width,
+					'height': rect.height,
+					'opacity': '0.8',
+					'position': (this.PositionGhostAbsolutely ? 'absolute' : 'fixed'),
+					'zIndex': '100000',
+					'pointerEvents': 'none'	
+				});
 				container.appendChild(ghostEl);
 			}
 		},
@@ -854,6 +868,7 @@ define('skylark-sortable/ghoster',[
 			if (this.ghostEl) {
 				noder.remove(this.ghostEl);
 			} 
+			this.ghostEl = null;
 
 		}
 
@@ -930,16 +945,35 @@ define('skylark-sortable/dnd',[
 
         prepare: function(draggable) {
         	this.draggable = draggable;
+            if (!draggable.nativeDraggable) {
+                eventer.on(document, 'mousemove', this._onTouchMove);
+                eventer.on(document, 'mouseup',function(evt){
+                	eventer.off(document,'mousemove', this._onTouchMove);
+                	if (dnd.putSortable) {
+                		dnd.putSortable._onDrop(evt)
+                	}
+                	if (dnd.draggable) {
+                		dnd.draggable._onDragEnd(evt);
+                	}
+                	ghoster.remove();
+                })
+            }
+
+		},
+
+        start: function(draggable, event) {
+        	this.draggable = draggable;
+
+
 			var el = draggable.elm(),
 				ownerDocument = el.ownerDocument;
+
 
 			eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
 			eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
 			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
-		},
 
-        start: function(draggable, event) {
-            if (this.draggable.nativeDraggable) {
+			if (this.draggable.nativeDraggable) {
                 eventer.on(document, 'dragover', this._handleAutoScroll);
                 eventer.on(document, 'dragover', this._checkAlignment);
             } else {
@@ -952,6 +986,9 @@ define('skylark-sortable/dnd',[
         },
 
         end: function(dropped) {
+	  		eventer.off(document, 'dragover', this.nearestEmptyInsertDetectEvent);
+	  		eventer.off(document, 'mousemove', this.nearestEmptyInsertDetectEvent);
+	
 			if (this.draggable.nativeDraggable) {
 				eventer.off(document, 'dragover', this._handleAutoScroll);
 				eventer.off(document, 'dragover', this._checkAlignment);
@@ -1136,9 +1173,10 @@ define('skylark-sortable/dnd',[
 		},
 
         _onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
-            dnd.log("_onTouchMove","start");
+            //dnd.log("_onTouchMove","start");
             var ghostEl = ghoster.ghostEl,
-            	draggable = dnd.draggable;
+            	draggable = dnd.draggable,
+            	tapEvt = dnd.tapEvt;
             if (tapEvt) {
                 var options =  draggable.options,
                     fallbackTolerance = options.fallbackTolerance,
@@ -1168,7 +1206,7 @@ define('skylark-sortable/dnd',[
 
                 !forAutoScroll && dnd._handleAutoScroll(touch, true);
 
-                moved = true;
+                ///moved = true;
                 dnd.touchEvt = touch;
 
                 if (ghostEl) {
@@ -1189,7 +1227,7 @@ define('skylark-sortable/dnd',[
 			dnd.rootEl =
 			dnd.dragEl =
 			dnd.parentEl =
-			ghoster.ghostEl =
+			//ghoster.ghostEl =
 			dnd.nextEl =
 			dnd.cloneEl =
 			///lastDownEl =
@@ -1199,7 +1237,7 @@ define('skylark-sortable/dnd',[
 			autoscroll.autoScrolls.length =
 
 
-			//tapEvt =
+			dnd.tapEvt =
 			dnd.touchEvt =
 
 			dnd.oldIndex =
@@ -1358,7 +1396,6 @@ define('skylark-sortable/Draggable',[
 
     var 
         lastDownEl,
-        tapEvt,
         scrolling,
 
         savedInputChecked = [];
@@ -1400,7 +1437,9 @@ define('skylark-sortable/Draggable',[
         pluginName : "intg.sortable.draggable",
 
         options : {
-            draggingClass : "dragging"
+            draggingClass : "dragging",
+            chosenClass : null
+
         },
 
         _construct: function(elm, options) {
@@ -1519,7 +1558,8 @@ define('skylark-sortable/Draggable',[
                 parentEl = dnd.parentEl,
                 nextEl = dnd.nextEl,
                 oldIndex = dnd.oldIndex,
-                oldDraggableIndex = dnd.oldDraggableIndex;
+                oldDraggableIndex = dnd.oldDraggableIndex,
+                tapEvt = dnd.tapEvt;
 
             dnd.log("_prepareDragStart","start");
             if (target && !dragEl && (target.parentNode === el)) {
@@ -1532,7 +1572,7 @@ define('skylark-sortable/Draggable',[
                 oldIndex = dnd.oldIndex = startIndex;
                 oldDraggableIndex = dnd.oldDraggableIndex =  startDraggableIndex;
 
-                tapEvt = {
+                tapEvt = dnd.tapEvt = {
                     target: dragEl,
                     clientX: (touch || evt).clientX,
                     clientY: (touch || evt).clientY
@@ -1547,10 +1587,6 @@ define('skylark-sortable/Draggable',[
                 dragEl.style.transform = '';
 
                 dragStartFn = function () {
-                    // Delayed drag has been triggered
-                    // we can re-enable the events: touchmove/mousemove
-                    _this._disableDelayedDragEvents();
-
                     if ( _this.nativeDraggable) {
                         dragEl.draggable = true;
                     }
@@ -1581,45 +1617,8 @@ define('skylark-sortable/Draggable',[
                     dragEl.draggable = true;
                 }
 
-                // Delay is impossible for native DnD in Edge or IE
-                if (options.delay && (options.delayOnTouchOnly ? touch : true) && (!this.nativeDraggable || !(Edge || IE11OrLess))) {
-                    // If the user moves the pointer or let go the click or touch
-                    // before the delay has been reached:
-                    // disable the delayed drag
-                    eventer.on(ownerDocument, 'mouseup', _this._disableDelayedDrag);
-                    //eventer.on(ownerDocument, 'touchend', _this._disableDelayedDrag);
-                    //eventer.on(ownerDocument, 'touchcancel', _this._disableDelayedDrag);
-                    eventer.on(ownerDocument, 'mousemove', _this._delayedDragTouchMoveHandler);
-                    //eventer.on(ownerDocument, 'touchmove', _this._delayedDragTouchMoveHandler);
-                    //options.supportPointer && eventer.on(ownerDocument, 'pointermove', _this._delayedDragTouchMoveHandler);
-
-                    _this._dragStartTimer = setTimeout(dragStartFn, options.delay);
-                } else {
-                    dragStartFn();
-                }
+                dragStartFn();
             }
-        },
-
-        _delayedDragTouchMoveHandler: function (/** TouchEvent|PointerEvent **/e) {
-            var touch = e.touches ? e.touches[0] : e;
-            if (Math.max( Math.abs(touch.clientX - this._lastX),  Math.abs(touch.clientY - this._lastY))
-                    >= Math.floor(this.options.touchStartThreshold / (this.nativeDraggable && window.devicePixelRatio || 1))
-            ) {
-                this._disableDelayedDrag();
-            }
-        },
-
-        _disableDelayedDrag: function () {
-            dnd.dragEl && dnd._disableDraggable(dnd.dragEl);
-            clearTimeout(this._dragStartTimer);
-
-            this._disableDelayedDragEvents();
-        },
-
-        _disableDelayedDragEvents: function () {
-            var ownerDocument = this._elm.ownerDocument;
-            eventer.off(ownerDocument, 'mouseup', this._disableDelayedDrag);
-            eventer.off(ownerDocument, 'mousemove', this._delayedDragTouchMoveHandler);
         },
 
         //native dnd mode : register _OnDragStart for dragstart event handler 
@@ -1745,9 +1744,18 @@ define('skylark-sortable/Draggable',[
             }
         },
 
+        _appendGhost: function () {
+            // Bug if using scale(): https://stackoverflow.com/questions/2637058
+            // Not being adjusted for
+            var rootEl =  this.elm();
+            var container = this.options.fallbackOnBody ? document.body : rootEl;
+            return ghoster._appendGhost(dnd.dragEl,container,this.options);
+        },
+
+
+
         _nulling: function() {
             lastDownEl = null;
-            tapEvt = null;
 
             savedInputChecked.forEach(function (el) {
                 el.checked = true;
@@ -1763,7 +1771,7 @@ define('skylark-sortable/Draggable',[
                 styler.hide(dnd.cloneEl);
                 dnd.cloneEl.cloneHidden = true;
                 if (dnd.cloneEl.parentNode && this.options.removeCloneOnHide) {
-                    dnd.cloneEl.parentNode.removeChild(dnd.cloneEl);
+                    noder.remove(dnd.cloneEl);
                 }
             }
         },
@@ -1844,7 +1852,6 @@ define('skylark-sortable/Draggable',[
             }
             dnd.end();
             this._nulling();
-
 
         }
 
@@ -2236,16 +2243,6 @@ define('skylark-sortable/Sortable',[
 
 
 
-
-		_appendGhost: function () {
-			// Bug if using scale(): https://stackoverflow.com/questions/2637058
-			// Not being adjusted for
-			var rootEl = dnd.draggable.elm();
-			var container = this.options.fallbackOnBody ? document.body : rootEl;
-			return ghoster._appendGhost(dnd.dragEl,container,this.options);
-		},
-
-
 		_animate: function (prevRect, target) {
 			var ms = this.options.animation,
 				dragEl = dnd.dragEl;
@@ -2293,10 +2290,10 @@ define('skylark-sortable/Sortable',[
 			return target.offsetWidth;
 		},
 
-		_offMoveEvents: function() {
-			eventer.off(document, 'dragover', dnd.nearestEmptyInsertDetectEvent);
-			eventer.off(document, 'mousemove', dnd.nearestEmptyInsertDetectEvent);
-		},
+		//_offMoveEvents: function() {
+	   //		eventer.off(document, 'dragover', dnd.nearestEmptyInsertDetectEvent);
+	   //		eventer.off(document, 'mousemove', dnd.nearestEmptyInsertDetectEvent);
+       //	},
 
 		_offUpEvents: function () {
 			var ownerDocument = this.el.ownerDocument;
@@ -2697,7 +2694,7 @@ define('skylark-sortable/Sortable',[
 			///	styler.css(document.body, 'user-select', '');
 			///}
 
-			this._offMoveEvents();
+			//this._offMoveEvents();
 			this._offUpEvents();
 
 			if (evt) {

@@ -16,7 +16,7 @@ function initPage($,Sortable) {
 	// Example 1 - Simple list
 	new Sortable(example1, {
 		animation: 150,
-		//forceFallback : true,
+		forceFallback : true,
 		ghostClass: 'blue-background-class'
 	});
 

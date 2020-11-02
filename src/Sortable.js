@@ -380,16 +380,6 @@ define([
 
 
 
-
-		_appendGhost: function () {
-			// Bug if using scale(): https://stackoverflow.com/questions/2637058
-			// Not being adjusted for
-			var rootEl = dnd.draggable.elm();
-			var container = this.options.fallbackOnBody ? document.body : rootEl;
-			return ghoster._appendGhost(dnd.dragEl,container,this.options);
-		},
-
-
 		_animate: function (prevRect, target) {
 			var ms = this.options.animation,
 				dragEl = dnd.dragEl;
@@ -437,10 +427,10 @@ define([
 			return target.offsetWidth;
 		},
 
-		_offMoveEvents: function() {
-			eventer.off(document, 'dragover', dnd.nearestEmptyInsertDetectEvent);
-			eventer.off(document, 'mousemove', dnd.nearestEmptyInsertDetectEvent);
-		},
+		//_offMoveEvents: function() {
+	   //		eventer.off(document, 'dragover', dnd.nearestEmptyInsertDetectEvent);
+	   //		eventer.off(document, 'mousemove', dnd.nearestEmptyInsertDetectEvent);
+       //	},
 
 		_offUpEvents: function () {
 			var ownerDocument = this.el.ownerDocument;
@@ -841,7 +831,7 @@ define([
 			///	styler.css(document.body, 'user-select', '');
 			///}
 
-			this._offMoveEvents();
+			//this._offMoveEvents();
 			this._offUpEvents();
 
 			if (evt) {
