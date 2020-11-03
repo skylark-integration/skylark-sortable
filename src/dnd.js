@@ -76,6 +76,10 @@ define([
                 		dnd.draggable._onDragEnd(evt);
                 	}
                 	ghoster.remove();
+                	if (dnd._loopId) {
+                		clearInterval(dnd._loopId);
+                	}
+                	dnd._loopId = null
                 })
             }
 
@@ -322,6 +326,9 @@ define([
                         return;
                     }
                     draggable._onDragStart(evt, true);
+                	dnd.ignoreNextClick = true;
+                	dnd._loopId = setInterval(dnd._emulateDragOver.bind(dnd), 50);
+
                 }
 
                 !forAutoScroll && dnd._handleAutoScroll(touch, true);

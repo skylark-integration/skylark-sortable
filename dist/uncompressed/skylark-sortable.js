@@ -956,6 +956,10 @@ define('skylark-sortable/dnd',[
                 		dnd.draggable._onDragEnd(evt);
                 	}
                 	ghoster.remove();
+                	if (dnd._loopId) {
+                		clearInterval(dnd._loopId);
+                	}
+                	dnd._loopId = null
                 })
             }
 
@@ -1202,6 +1206,9 @@ define('skylark-sortable/dnd',[
                         return;
                     }
                     draggable._onDragStart(evt, true);
+                	dnd.ignoreNextClick = true;
+                	dnd._loopId = setInterval(dnd._emulateDragOver.bind(dnd), 50);
+
                 }
 
                 !forAutoScroll && dnd._handleAutoScroll(touch, true);
@@ -1876,6 +1883,7 @@ define('skylark-sortable/Sortable',[
 	"skylark-domx-transforms",
 	"skylark-domx-scrolls/scrollingElement",
 	"skylark-domx-layouts/oriented",
+    "skylark-domx-plugins",
 	"skylark-devices-points/touch",
 	"./autoscroll",
 	"./containers",
@@ -1897,6 +1905,7 @@ define('skylark-sortable/Sortable',[
 	transforms,
 	scrollingElement,
 	oriented,
+	plugins,
 	touch,
 	autoscroll,
 	containers,
@@ -2084,25 +2093,13 @@ define('skylark-sortable/Sortable',[
 	*/
 
 
-	/**
-	 * @class  Sortable
-	 * @param  {HTMLElement}  el
-	 * @param  {Object}       [options]
-	 */
-	function Sortable(el, options) {
-		if (!(el && el.nodeType && el.nodeType === 1)) {
-			throw 'Sortable: `el` must be HTMLElement, not ' + {}.toString.call(el);
-		}
-
-		this.el = el; // root element
-		this.options = options = langx.mixin({}, options);
+	var Sortable =  plugins.Plugin.inherit({
+        klassName: "Sortable",
+        
+        pluginName : "intg.sortable",
 
 
-		// Export instance
-		el[dnd.expando] = this;
-
-		// Default options
-		var defaults = {
+		options : {
 			group: null,
 			sort: true,
 			disabled: false,
@@ -2112,13 +2109,13 @@ define('skylark-sortable/Sortable',[
 			scrollSensitivity: 30,
 			scrollSpeed: 10,
 			bubbleScroll: true,
-			draggable: /[uo]l/i.test(el.nodeName) ? '>li' : '>*',
+			//draggable: /[uo]l/i.test(el.nodeName) ? '>li' : '>*',
 			swapThreshold: 1, // percentage; 0 <= x <= 1
 			invertSwap: false, // invert always
 			invertedSwapThreshold: null, // will be set to same as swapThreshold if default
 			removeCloneOnHide: true,
 			direction: function(evt, target, dragEl,ghostEl) {
-				return oriented(el, langx.mixin({
+				return oriented(this.el, langx.mixin({
 									excluding : [ghostEl,dragEl]
 								},this.options));
 			},
@@ -2144,61 +2141,72 @@ define('skylark-sortable/Sortable',[
 			fallbackOnBody: false,
 			fallbackTolerance: 0,
 			fallbackOffset: {x: 0, y: 0},
-			supportPointer: Sortable.supportPointer !== false && ('PointerEvent' in window),
+			//supportPointer: Sortable.supportPointer !== false && ('PointerEvent' in window),
 			emptyInsertThreshold: 5
-		};
+		},
 
 
-		// Set default options
-		for (var name in defaults) {
-			!(name in options) && (options[name] = defaults[name]);
-		}
+		/**
+		 * @class  Sortable
+		 * @param  {HTMLElement}  el
+		 * @param  {Object}       [options]
+		 */
+		_construct : function Sortable(el, options) {
+            this.overrided(el,options);
 
-		_prepareGroup(options);
+			this.el = el; // root element
 
-		// Bind all private methods
-		for (var fn in this) {
-			if (fn.charAt(0) === '_' && typeof this[fn] === 'function') {
-				this[fn] = this[fn].bind(this);
+			// Export instance
+			el[dnd.expando] = this;
+
+			options = this.options;
+
+			options.draggable = options.draggable || /[uo]l/i.test(el.nodeName) ? '>li' : '>*';
+
+
+			_prepareGroup(options);
+
+			// Bind all private methods
+			for (var fn in this) {
+				if (fn.charAt(0) === '_' && typeof this[fn] === 'function') {
+					this[fn] = this[fn].bind(this);
+				}
 			}
-		}
 
-		// Setup drag mode
-		this.nativeDraggable = options.forceFallback ? false : supportDraggable;
+			// Setup drag mode
+			this.nativeDraggable = options.forceFallback ? false : supportDraggable;
 
-		///if (this.nativeDraggable) {
-		///	// Touch start threshold cannot be greater than the native dragstart threshold
-		///	this.options.touchStartThreshold = 1;
-		///}
+			///if (this.nativeDraggable) {
+			///	// Touch start threshold cannot be greater than the native dragstart threshold
+			///	this.options.touchStartThreshold = 1;
+			///}
 
-		// Bind events
-		///touch.mousy(el);
+			// Bind events
+			///touch.mousy(el);
 
-		///eventer.on(el, 'mousedown', this._onTapStart);
+			///eventer.on(el, 'mousedown', this._onTapStart);
 
-		this.draggable = new Draggable(this.el,langx.mixin({
-			nativeDraggable : this.nativeDraggable,
-			sortable : this
-		},this.options));
+			this.draggable = new Draggable(this.el,langx.mixin({
+				nativeDraggable : this.nativeDraggable,
+				sortable : this
+			},this.options));
 
-		if (this.nativeDraggable) {
-			eventer.on(el, 'dragover', this);
-			eventer.on(el, 'dragenter', this);
-	        eventer.on(el, 'drop', this);
-		}
+			if (this.nativeDraggable) {
+				eventer.on(el, 'dragover', this);
+				eventer.on(el, 'dragenter', this);
+		        eventer.on(el, 'drop', this);
+			}
 
-		dnd.sortables.push(this.el);
+			dnd.sortables.push(this.el);
 
-		// Restore sorting
-		options.store && options.store.get && this.sort(options.store.get(this) || []);
+			// Restore sorting
+			options.store && options.store.get && this.sort(options.store.get(this) || []);
 
 
-        eventer.on(el, 'selectstart', this);
+	        eventer.on(el, 'selectstart', this);
 
-	}
+		},
 
-	Sortable.prototype = /** @lends Sortable.prototype */ {
-		constructor: Sortable,
 
 		_computeIsAligned: function(evt) {
 			var target,
@@ -2945,7 +2953,7 @@ define('skylark-sortable/Sortable',[
 
 			this.el = el = null;
 		}
-	};
+	});
 
 
     function _globalDragOver(/**Event*/evt) {

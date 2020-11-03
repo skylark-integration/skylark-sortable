@@ -15,6 +15,7 @@ define([],function(){
         this._effectAllowed = 'all';
         this._data = {};
     }
+
     Object.defineProperty(DataTransfer.prototype, "dropEffect", {
         /**
          * Gets or sets the type of drag-and-drop operation currently selected.
@@ -29,6 +30,7 @@ define([],function(){
         enumerable: true,
         configurable: true
     });
+    
     Object.defineProperty(DataTransfer.prototype, "effectAllowed", {
         /**
          * Gets or sets the types of operations that are possible.
@@ -44,6 +46,7 @@ define([],function(){
         enumerable: true,
         configurable: true
     });
+
     Object.defineProperty(DataTransfer.prototype, "types", {
         /**
          * Gets an array of strings giving the formats that were set in the @see:dragstart event.
@@ -54,6 +57,7 @@ define([],function(){
         enumerable: true,
         configurable: true
     });
+
     /**
      * Removes the data associated with a given type.
      *
@@ -71,6 +75,7 @@ define([],function(){
             this._data = null;
         }
     };
+
     /**
      * Retrieves the data for a given type, or an empty string if data for that type does
      * not exist or the data transfer contains no data.
@@ -80,6 +85,7 @@ define([],function(){
     DataTransfer.prototype.getData = function (type) {
         return this._data[type] || '';
     };
+
     /**
      * Set the data for a given type.
      *
@@ -92,6 +98,7 @@ define([],function(){
     DataTransfer.prototype.setData = function (type, value) {
         this._data[type] = value;
     };
+
     /**
      * Set the image to be used for dragging if a custom one is desired.
      *
@@ -104,5 +111,6 @@ define([],function(){
         ddt._imgCustom = img;
         ddt._imgOffset = { x: offsetX, y: offsetY };
     };
+
     return DataTransfer;
 });
