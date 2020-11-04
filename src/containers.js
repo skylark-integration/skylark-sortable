@@ -65,7 +65,7 @@ define([
 		},
 
 		_isElInRowColumn = function(el1, el2, axis) {
-			var dragEl = dnd.dragEl;
+			var dragEl = dnd.draggable.dragEl;
 
 			var el1Rect = geom.boundingRect(el1),//el1 === dragEl && realDragElRect || geom.boundingRect(el1),
 				el2Rect = geom.boundingRect(el2),//el2 === dragEl && realDragElRect || geom.boundingRect(el2),

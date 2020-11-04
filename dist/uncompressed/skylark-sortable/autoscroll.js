@@ -19,6 +19,10 @@ define([
 		scrollCustomFn,
 		pointerElemChangedInterval,
 
+		lastPointerElemX,
+		lastPointerElemY,
+
+
 		scrollParentEl = null;
 
 	var
@@ -209,10 +213,10 @@ define([
 						/* jshint loopfunc:true */
 						autoScrolls[layersOut].pid = setInterval((function () {
 							// emulate drag over during autoscroll (fallback), emulating native DnD behaviour
-							if (isFallback && this.layer === 0) {
-								Sortable.active._emulateDragOver(true);
-								Sortable.active._onTouchMove(touchEvt, true);
-							}
+							///if (isFallback && this.layer === 0) {
+							///	Sortable.active._emulateDragOver(true);
+							///	Sortable.active._onTouchMove(toudrachEvt, true);
+							///}
 							var scrollOffsetY = autoScrolls[this.layer].vy ? autoScrolls[this.layer].vy * speed : 0;
 							var scrollOffsetX = autoScrolls[this.layer].vx ? autoScrolls[this.layer].vx * speed : 0;
 
@@ -239,7 +243,7 @@ define([
 		autoScrolls = [];
 	},
 
-	_handleAutoScroll = function(evt, options,fallback) {
+	_handleAutoScroll = function(evt, options,fallback,expando) {
 		var x = evt.clientX,
 			y = evt.clientY,
 
@@ -250,7 +254,7 @@ define([
 		// MACOS Safari does not have autoscroll,
 		// Firefox and Chrome are good
 		if (fallback || Edge || IE11OrLess || Safari) {
-			_throttleTimeout = _autoScroll(evt, options, elem, fallback);
+			_throttleTimeout = _autoScroll(evt, options, elem, fallback,expando);
 
 			// Listener for pointer element change
 			var ogElemScroller = _getParentAutoScrollElement(elem, true);
@@ -266,7 +270,7 @@ define([
 				pointerElemChangedInterval && clearInterval(pointerElemChangedInterval);
 				// Detect for pointer elem change, emulating native DnD behaviour
 				pointerElemChangedInterval = setInterval(function() {
-					if (!dragEl) return;
+					//if (!dragEl) return;
 					// could also check if scroll direction on newElem changes due to parent autoscrolling
 					var newElem = _getParentAutoScrollElement(document.elementFromPoint(x, y), true);
 					if (newElem !== ogElemScroller) {
@@ -308,6 +312,14 @@ define([
 	function _nulling() {
 		pointerElemChangedInterval && clearInterval(pointerElemChangedInterval);
 		pointerElemChangedInterval = null;
+		lastPointerElemX = null;
+		lastPointerElemY = null;
+
+		this.scrollEl =
+		this.scrollParentEl =
+		this.autoScrolls.length = null;
+
+
 
 	}
 	return {

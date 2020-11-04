@@ -14,6 +14,7 @@ var example1 = document.getElementById('example1'),
 new Sortable(example1, {
 	animation: 150,
 	forceFallback : true,
+	fallbackOnBody: true,
 	ghostClass: 'blue-background-class'
 });
 
