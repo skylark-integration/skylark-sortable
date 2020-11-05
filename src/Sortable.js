@@ -17,8 +17,7 @@ define([
 	"skylark-devices-points/touch",
 	"./fallback/autoscroll",
 	"./containers",
-	"./dnd",
-	"./fallback/ghoster"
+	"./dnd"
 ],function(
 	skylark,
 	langx,
@@ -38,8 +37,7 @@ define([
 	touch,
 	autoscroll,
 	containers,
-	dnd,
-	ghoster,
+	dnd
 ){
 
 	'use strict';
@@ -79,6 +77,43 @@ define([
         }
     }
 
+	 function _ghostIsLast(evt, axis, el) {
+		var elRect = geom.boundingRect(finder.lastChild(el,{ignoreHidden : true,excluding : []})),
+			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
+			mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
+			targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
+			targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
+			targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
+			spacer = 10;
+
+		return (
+			axis === 'vertical' ?
+				(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
+				(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
+		);
+	}
+
+
+	/**
+	 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
+	 * @param  {HTMLElement} el       Parent element
+	 * @return {HTMLElement}          The last child, ignoring ghostEl
+	 */
+	 function _lastChild(el) {
+		/*
+		var last = el.lastElementChild;
+
+		while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
+			last = last.previousElementSibling;
+		}
+
+		return last || null;
+		*/
+		return finder.lastChild(el,{
+			ignoreHidden : true,
+			excluding : []
+		})
+	}
 
 	var 
 		//parentEl,
@@ -774,7 +809,7 @@ define([
 		_getDirection: function(evt, target) {
 			var  dragEl = dnd.draggable.dragEl;
 
-			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,ghoster.ghostEl) : this.options.direction;
+			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,null) : this.options.direction;
 		},
 
 
@@ -1055,9 +1090,9 @@ define([
 					return completed(true);
 				}
 
-				var elLastChild = ghoster._lastChild(el);
+				var elLastChild = _lastChild(el);
 
-				if (!elLastChild || ghoster._ghostIsLast(evt, axis, el) && !elLastChild.animated) {
+				if (!elLastChild || _ghostIsLast(evt, axis, el) && !elLastChild.animated) {
 					// assign target only if condition is true
 					if (elLastChild && el === evt.target) {
 						target = elLastChild;
@@ -1239,7 +1274,7 @@ define([
 					!options.dropBubble && evt.stopPropagation();
 				}
 
-				ghoster.remove();
+				//ghoster.remove();
 
 				if (rootEl === parentEl || (putSortable && putSortable.lastPutMode !== 'clone')) {
 					// Remove clone
