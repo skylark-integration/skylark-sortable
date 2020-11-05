@@ -932,7 +932,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 
                 }
 
-                !forAutoScroll && dnd._handleAutoScroll(touch, true);
+                !forAutoScroll && this._handleAutoScroll(touch, true);
 
                 ///moved = true;
                 dnd.touchEvt = touch;
@@ -1004,6 +1004,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 
 
 		_handleAutoScroll: function(evt, fallback) {
+			var dnd = this.dnd;
 
 			if (!dnd.draggable.dragEl || !dnd.draggable.options.scroll) return;
 
@@ -1016,6 +1017,10 @@ define('skylark-sortable/fallback/MousedDragDrop',[
         		clearInterval(this._loopId);
         	}
 
+            autoscroll._nulling();
+            
+            autoscroll._clearAutoScrolls();
+            autoscroll._cancelThrottle();
 		}
 	});
 
@@ -1297,7 +1302,6 @@ define('skylark-sortable/Sortable',[
 	"skylark-domx-layouts/oriented",
     "skylark-domx-plugins",
 	"skylark-devices-points/touch",
-	"./fallback/autoscroll",
 	"./containers",
 	"./dnd"
 ],function(
@@ -1317,7 +1321,6 @@ define('skylark-sortable/Sortable',[
 	oriented,
 	plugins,
 	touch,
-	autoscroll,
 	containers,
 	dnd
 ){
@@ -1976,10 +1979,6 @@ define('skylark-sortable/Sortable',[
             //clearInterval(this._loopId);
 
             //clearInterval(pointerElemChangedInterval);
-            autoscroll._nulling();
-            
-            autoscroll._clearAutoScrolls();
-            autoscroll._cancelThrottle();
 
             clearTimeout(this._dragStartTimer);
 
@@ -2405,7 +2404,7 @@ define('skylark-sortable/Sortable',[
 						aligned = target.sortableMouseAligned,
 						differentLevel = dragEl.parentNode !== el,
 						side1 = axis === 'vertical' ? 'top' : 'left',
-						scrolledPastTop = autoscroll._isScrolledPast(target, 'top') || autoscroll._isScrolledPast(dragEl, 'top'),
+						scrolledPastTop = false, //autoscroll._isScrolledPast(target, 'top') || autoscroll._isScrolledPast(dragEl, 'top'),
 						scrollBefore = scrolledPastTop ? scrolledPastTop.scrollTop : void 0;
 
 

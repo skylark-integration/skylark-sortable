@@ -78,7 +78,7 @@ define([
 
                 }
 
-                !forAutoScroll && dnd._handleAutoScroll(touch, true);
+                !forAutoScroll && this._handleAutoScroll(touch, true);
 
                 ///moved = true;
                 dnd.touchEvt = touch;
@@ -150,6 +150,7 @@ define([
 
 
 		_handleAutoScroll: function(evt, fallback) {
+			var dnd = this.dnd;
 
 			if (!dnd.draggable.dragEl || !dnd.draggable.options.scroll) return;
 
@@ -162,6 +163,10 @@ define([
         		clearInterval(this._loopId);
         	}
 
+            autoscroll._nulling();
+            
+            autoscroll._clearAutoScrolls();
+            autoscroll._cancelThrottle();
 		}
 	});
 
