@@ -5,5 +5,5 @@
  * @link https://github.com/skylark-integration/skylark-sortable/
  * @license MIT
  */
-define(["skylark-langx","skylark-domx-eventer","skylark-domx-finder","skylark-domx-noder","skylark-domx-styler","./fallback/autoscroll","./containers","./Sortable"],function(e,n,t,l,o,r,s,c){return c.utils={on:n.on,off:n.off,css:o.css,is:function(e,n){return!!t.closest(e,n,e,!1)},extend:e.mixin,throttle:r._throttle,closest:t.closest,toggleClass:o.toggleClass,clone:function(e){return l.clone(e,!0)},index:s._index,nextTick:function(n){return e.defer(n)},cancelNextTick:function(e){return e&&e.stop()},getChild:function(e,n,l){return l.excluding=[],l.closesting=l.draggable,t.childAt(e,n,l)}},c});
+define(["skylark-langx","skylark-domx-eventer","skylark-domx-finder","skylark-domx-noder","skylark-domx-styler","./fallback/autoscroll","./Sortable"],function(e,t,n,l,o,r,s){return s.utils={on:t.on,off:t.off,css:o.css,is:function(e,t){return!!n.closest(e,t,e,!1)},extend:e.mixin,throttle:r._throttle,closest:n.closest,toggleClass:o.toggleClass,clone:function(e){return l.clone(e,!0)},nextTick:function(t){return e.defer(t)},cancelNextTick:function(e){return e&&e.stop()},getChild:function(e,t,l){return l.excluding=[],l.closesting=l.draggable,n.childAt(e,t,l)}},s});
 //# sourceMappingURL=sourcemaps/main.js.map

@@ -15,7 +15,6 @@ define([
 	"skylark-domx-layouts/oriented",
     "skylark-domx-plugins",
 	"skylark-devices-points/touch",
-	"./containers",
 	"./dnd"
 ],function(
 	skylark,
@@ -34,7 +33,6 @@ define([
 	oriented,
 	plugins,
 	touch,
-	containers,
 	dnd
 ){
 
@@ -61,6 +59,52 @@ define([
 
         return [];
     }
+
+	/**
+	 * Returns the index of an element within its parent for a selected set of
+	 * elements
+	 * @param  {HTMLElement} el
+	 * @param  {selector} selector
+	 * @return {number}
+	 */
+	function _index(el, selector) {
+		return finder.index(el,function(el){
+			if ((el.nodeName.toUpperCase() !== 'TEMPLATE') && el !== dnd.cloneEl && (!selector || finder.matches(el, selector))) {
+				return true;
+			}
+
+			return false;			
+		})
+	}
+
+
+	function _isClientInRowColumn(x, y, el, axis, options) {
+		var targetRect = geom.boundingRect(el),
+			targetS1Opp = axis === 'vertical' ? targetRect.left : targetRect.top,
+			targetS2Opp = axis === 'vertical' ? targetRect.right : targetRect.bottom,
+			mouseOnOppAxis = axis === 'vertical' ? x : y;
+
+		return targetS1Opp < mouseOnOppAxis && mouseOnOppAxis < targetS2Opp;
+	}
+
+	function _isElInRowColumn(el1, el2, axis) {
+		//var dragEl = dnd.active.dragEl;
+
+		var el1Rect = geom.boundingRect(el1),//el1 === dragEl && realDragElRect || geom.boundingRect(el1),
+			el2Rect = geom.boundingRect(el2),//el2 === dragEl && realDragElRect || geom.boundingRect(el2),
+			el1S1Opp = axis === 'vertical' ? el1Rect.left : el1Rect.top,
+			el1S2Opp = axis === 'vertical' ? el1Rect.right : el1Rect.bottom,
+			el1OppLength = axis === 'vertical' ? el1Rect.width : el1Rect.height,
+			el2S1Opp = axis === 'vertical' ? el2Rect.left : el2Rect.top,
+			el2S2Opp = axis === 'vertical' ? el2Rect.right : el2Rect.bottom,
+			el2OppLength = axis === 'vertical' ? el2Rect.width : el2Rect.height;
+
+		return (
+			el1S1Opp === el2S1Opp ||
+			el1S2Opp === el2S2Opp ||
+			(el1S1Opp + el1OppLength / 2) === (el2S1Opp + el2OppLength / 2)
+		);
+	}
 
 
     function _saveInputCheckedState(root) {
@@ -444,8 +488,8 @@ define([
             dnd.log("_onTapStart",target.tagName+","+target.className);
 
             // Get the index of the dragged element within its parent
-            startIndex = containers._index(target);
-            startDraggableIndex = containers._index(target, options.draggable);
+            startIndex = _index(target);
+            startDraggableIndex = _index(target, options.draggable);
 
             // Check filter
             if (typeof filter === 'function') {
@@ -637,7 +681,41 @@ define([
 
             dnd.awaitingDragStarted = true;
 
-            _this._dragStartId = langx.defer(_this._dragStarted.bind(_this, fallback, evt));
+
+	        function _dragStarted(fallback, evt) {
+	            dnd.awaitingDragStarted = false;
+	            var dragEl = this.dragEl,
+	                rootEl = this._elm,
+	                oldIndex = dnd.oldIndex,
+	                oldDraggableIndex = dnd.oldDraggableIndex;
+
+	            if (rootEl && dragEl) {
+	                //if (this.nativeDraggable) {
+	                //    eventer.on(document, 'dragover', this._handleAutoScroll);
+	                //    eventer.on(document, 'dragover', dnd._checkAlignment);
+	                //}
+	                dnd.start(this);
+	                var options = this.options;
+
+	                // Apply effect
+	                !fallback && styler.toggleClass(dragEl, options.dragClass, false);
+	                styler.toggleClass(dragEl, options.ghostClass, true);
+
+	                // In case dragging an animated element
+	                styler.css(dragEl, 'transform', '');
+
+	                //dnd.active = this;
+
+	                //fallback && this._appendGhost();
+
+	                // Drag start event
+	                this._dispatchEvent(this, rootEl, 'start', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex, undefined, evt);
+	            } else {
+	                this._nulling();
+	            }
+	        }
+
+            _this._dragStartId = langx.defer(_dragStarted.bind(_this, fallback, evt));
             ///eventer.on(document, 'selectstart', _this);
             ///if (Safari) {
             ///    styler.css(document.body, 'user-select', 'none');
@@ -646,38 +724,7 @@ define([
 
         //
         //
-        _dragStarted: function (fallback, evt) {
-            dnd.awaitingDragStarted = false;
-            var dragEl = this.dragEl,
-                rootEl = this._elm,
-                oldIndex = dnd.oldIndex,
-                oldDraggableIndex = dnd.oldDraggableIndex;
 
-            if (rootEl && dragEl) {
-                //if (this.nativeDraggable) {
-                //    eventer.on(document, 'dragover', this._handleAutoScroll);
-                //    eventer.on(document, 'dragover', dnd._checkAlignment);
-                //}
-                dnd.start(this);
-                var options = this.options;
-
-                // Apply effect
-                !fallback && styler.toggleClass(dragEl, options.dragClass, false);
-                styler.toggleClass(dragEl, options.ghostClass, true);
-
-                // In case dragging an animated element
-                styler.css(dragEl, 'transform', '');
-
-                dnd.active = this;
-
-                //fallback && this._appendGhost();
-
-                // Drag start event
-                this._dispatchEvent(this, rootEl, 'start', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex, undefined, evt);
-            } else {
-                this._nulling();
-            }
-        },
         _onDragEnd: function (/**Event*/evt) {
             var el = this._elm,
                 options = this.options,
@@ -767,7 +814,7 @@ define([
 
 		_computeIsAligned: function(evt) {
 			var target,
-				dragEl = dnd.draggable.dragEl;
+				dragEl = dnd.active.dragEl;
 
 			//if (ghostEl && !supportCssPointerEvents) {
 			//	_hideGhostForTarget();
@@ -785,7 +832,7 @@ define([
 			for (var i = 0; i < children.length; i++) {
 				// Don't change for target in case it is changed to aligned before onDragOver is fired
 				if (finder.closest(children[i], this.options.draggable, this.el, false) && children[i] !== target) {
-					children[i].sortableMouseAligned = containers._isClientInRowColumn(evt.clientX, evt.clientY, children[i], this._getDirection(evt, null), this.options);
+					children[i].sortableMouseAligned = _isClientInRowColumn(evt.clientX, evt.clientY, children[i], this._getDirection(evt, null), this.options);
 				}
 			}
 			// Used for nulling last target when not in element, nothing to do with checking if aligned
@@ -801,7 +848,7 @@ define([
 		},
 
 		_getDirection: function(evt, target) {
-			var  dragEl = dnd.draggable.dragEl;
+			var  dragEl = dnd.active.dragEl;
 
 			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,null) : this.options.direction;
 		},
@@ -810,7 +857,7 @@ define([
 
 		_animate: function (prevRect, target) {
 			var ms = this.options.animation,
-				dragEl = dnd.draggable.dragEl;
+				dragEl = dnd.active.dragEl;
 
 			if (ms) {
 				var currentRect = geom.boundingRect(target);
@@ -881,8 +928,8 @@ define([
 				isOwner = (dnd.activeGroup === group),
 				canSort = options.sort,
 				_this = this,
-				dragEl = dnd.draggable.dragEl,
-				rootEl = dnd.draggable.elm(),
+				dragEl = dnd.active.dragEl,
+				rootEl = dnd.active.elm(),
 				putSortable = dnd.putSortable,
 				nextEl = dnd.nextEl,
 				oldIndex = dnd.oldIndex,
@@ -940,7 +987,7 @@ define([
 
 			// Call when dragEl has been inserted
 			function changed() {
-				_this._dispatchEvent(_this, rootEl, 'change', target, el, rootEl, oldIndex, containers._index(dragEl), oldDraggableIndex, containers._index(dragEl, options.draggable), evt);
+				_this._dispatchEvent(_this, rootEl, 'change', target, el, rootEl, oldIndex, _index(dragEl), oldDraggableIndex, _index(dragEl, options.draggable), evt);
 			}
 
 
@@ -951,8 +998,8 @@ define([
 			 * @return {Number}                   Direction dragEl must be swapped
 			 */
 			function _getInsertDirection(target) {
-				var dragElIndex = containers._index(dragEl),
-					targetIndex = containers._index(target);
+				var dragElIndex = _index(dragEl),
+					targetIndex = _index(target);
 
 				if (dragElIndex < targetIndex) {
 					return 1;
@@ -1129,7 +1176,7 @@ define([
 
 					// Reference: https://www.lucidchart.com/documents/view/10fa0e93-e362-4126-aca2-b709ee56bd8b/0
 					if (
-						containers._isElInRowColumn(dragEl, target, axis) && aligned ||
+						_isElInRowColumn(dragEl, target, axis) && aligned ||
 						differentLevel ||
 						scrolledPastTop ||
 						options.invertSwap ||
@@ -1217,8 +1264,8 @@ define([
 		_onDrop: function (/**Event*/evt) {
 			var el = this.el,
 				options = this.options,
-				rootEl = dnd.draggable.elm(),
-				dragEl = dnd.draggable.dragEl,
+				rootEl = dnd.active.elm(),
+				dragEl = dnd.active.dragEl,
 				putSortable = dnd.putSortable,
 				parentEl = dnd.parentEl,
 				oldIndex = dnd.oldIndex,
@@ -1291,8 +1338,8 @@ define([
 					this._dispatchEvent(this, rootEl, 'unchoose', dragEl, parentEl, rootEl, oldIndex, null, oldDraggableIndex, null, evt);
 
 					if (rootEl !== parentEl) {
-						newIndex = containers._index(dragEl);
-						newDraggableIndex = containers._index(dragEl, options.draggable);
+						newIndex = _index(dragEl);
+						newDraggableIndex = _index(dragEl, options.draggable);
 
 						if (newIndex >= 0) {
 							// Add event
@@ -1310,8 +1357,8 @@ define([
 					}else {
 						if (dragEl.nextSibling !== nextEl) {
 							// Get the index of the dragged element within its parent
-							newIndex = containers._index(dragEl);
-							newDraggableIndex = containers._index(dragEl, options.draggable);
+							newIndex = _index(dragEl);
+							newDraggableIndex = _index(dragEl, options.draggable);
 
 							if (newIndex >= 0) {
 								// drag & drop within the same list
@@ -1397,8 +1444,8 @@ define([
 
             if (dnd.cloneEl.cloneHidden) {
                 // show clone at dragEl or original position
-                if (rootEl.contains(dnd.draggable.dragEl) && !this.options.group.revertClone) {
-                    rootEl.insertBefore(dnd.cloneEl, dnd.draggable.dragEl);
+                if (rootEl.contains(dnd.active.dragEl) && !this.options.group.revertClone) {
+                    rootEl.insertBefore(dnd.cloneEl, dnd.active.dragEl);
                 } else if (nextEl) {
                     rootEl.insertBefore(dnd.cloneEl, nextEl);
                 } else {
@@ -1406,7 +1453,7 @@ define([
                 }
 
                 if (this.options.group.revertClone) {
-                    this._animate(dnd.draggable.dragEl, dnd.cloneEl);
+                    this._animate(dnd.active.dragEl, dnd.cloneEl);
                 }
                 styler.show(dnd.cloneEl);
                 dnd.cloneEl.cloneHidden = false;
@@ -1421,7 +1468,7 @@ define([
 
 				case 'dragenter':
 				case 'dragover':
-					if (dnd.draggable.dragEl) {
+					if (dnd.active.dragEl) {
 						this._onDragOver(evt);
 						_globalDragOver(evt);
 					}

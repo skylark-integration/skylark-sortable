@@ -31,8 +31,8 @@ define([
         	if (dnd.putSortable) {
         		dnd.putSortable._onDrop(evt)
         	}
-        	if (dnd.draggable) {
-        		dnd.draggable._onDragEnd(evt);
+        	if (dnd.active) {
+        		dnd.active._onDragEnd(evt);
         	}
         	ghoster.remove();
         	this.destroy();
@@ -42,7 +42,7 @@ define([
             //dnd.log("_onTouchMove","start");
             var dnd = this.dnd,
             	ghostEl = ghoster.ghostEl,
-            	draggable = dnd.draggable,
+            	draggable = dnd.active,
             	dragEl = draggable.dragEl,
             	tapEvt = dnd.tapEvt;
             if (tapEvt) {
@@ -63,7 +63,7 @@ define([
                     translate3d = evt.touches ? 'translate3d(' + dx + 'px,' + dy + 'px,0)' : 'translate(' + dx + 'px,' + dy + 'px)';
 
                 // only set the status to dragging, when we are actually dragging
-                if (!dnd.active && !dnd.awaitingDragStarted) {
+                if (!this._dragStarted && !dnd.awaitingDragStarted) {
                     if (fallbackTolerance &&
                         Math.min( Math.abs(touch.clientX - draggable._lastX),  Math.abs(touch.clientY - draggable._lastY)) < fallbackTolerance
                     ) {
@@ -74,6 +74,8 @@ define([
                     ghoster._appendGhost(dragEl,document.body,draggable.options);
 
                 	dnd.ignoreNextClick = true;
+
+                	this._dragStarted = true;
                 	this._loopId = setInterval(this._emulateDragOver.bind(this), 50);
 
                 }
@@ -98,7 +100,7 @@ define([
 
 		_emulateDragOver: function (forAutoScroll) {
 			var dnd = this.dnd,
-				dragEl = dnd.draggable.dragEl,
+				dragEl = dnd.active.dragEl,
 				touchEvt = dnd.touchEvt;
 
 			if (touchEvt) {
@@ -152,9 +154,9 @@ define([
 		_handleAutoScroll: function(evt, fallback) {
 			var dnd = this.dnd;
 
-			if (!dnd.draggable.dragEl || !dnd.draggable.options.scroll) return;
+			if (!dnd.active.dragEl || !dnd.active.options.scroll) return;
 
-			return autoscroll._handleAutoScroll(evt,dnd.draggable.options,fallback,dnd.expando);
+			return autoscroll._handleAutoScroll(evt,dnd.active.options,fallback,dnd.expando);
 		},
 
 		destroy : function() {
@@ -167,6 +169,7 @@ define([
             
             autoscroll._clearAutoScrolls();
             autoscroll._cancelThrottle();
+            this._dragStarted = false;
 		}
 	});
 

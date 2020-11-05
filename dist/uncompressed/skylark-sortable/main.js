@@ -5,7 +5,6 @@ define([
 	"skylark-domx-noder",
 	"skylark-domx-styler",
 	"./fallback/autoscroll",
-	"./containers",
 	"./Sortable"
 ],function(
 	langx,
@@ -14,7 +13,6 @@ define([
 	noder,
 	styler,
 	autoscroll,
-	containers,
 	Sortable
 ){
 	// Export utils
@@ -33,7 +31,7 @@ define([
 		clone: 	function (el) {
 					return noder.clone(el,true);
 				},
-		index: containers._index,
+		//index: containers._index,
 		nextTick: 	function _nextTick(fn) {
 			//return setTimeout(fn, 0);
 			return langx.defer(fn);

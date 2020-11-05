@@ -48,29 +48,29 @@ define([
 
 		touchEvt : null,
 
-        prepare: function(draggable) {
-        	this.draggable = draggable;
-            if (!draggable.nativeDraggable) {
+        prepare: function(sortable) {
+        	this.active = sortable;
+            if (!this.active.nativeDraggable) {
             	this._fallbacker = new MousedDragDrop(this);
             }
 
 		},
 
-        start: function(draggable, event) {
-        	this.draggable = draggable;
+        start: function(sortable, event) {
+        	this.active = sortable;
 
 
-			var el = draggable.elm(),
+			var el = this.active.elm(),
 				ownerDocument = el.ownerDocument;
 
 
-			eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
+			//eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
 			///eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
 			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
 
-			if (this.draggable.nativeDraggable) {
+			if (this.active.nativeDraggable) {
                 ///eventer.on(document, 'dragover', this._handleAutoScroll);
-                eventer.on(document, 'dragover', this._checkAlignment);
+               // eventer.on(document, 'dragover', this._checkAlignment);
             } else {
                 ///eventer.on(document, 'mousemove', this._handleAutoScroll);
             }
@@ -81,12 +81,12 @@ define([
         },
 
         end: function(dropped) {
-	  		eventer.off(document, 'dragover', this.nearestEmptyInsertDetectEvent);
+	  		//eventer.off(document, 'dragover', this.nearestEmptyInsertDetectEvent);
 	  		///eventer.off(document, 'mousemove', this.nearestEmptyInsertDetectEvent);
 	
-			if (this.draggable.nativeDraggable) {
+			if (this.active.nativeDraggable) {
 				///eventer.off(document, 'dragover', this._handleAutoScroll);
-				eventer.off(document, 'dragover', this._checkAlignment);
+				//eventer.off(document, 'dragover', this._checkAlignment);
 			} else {
 		        // Unbind events
 	            ///eventer.off(document, 'mousemove', this._onTouchMove);
@@ -97,7 +97,7 @@ define([
  		},
 
 		nearestEmptyInsertDetectEvent :function (evt) {
-			if (dnd.draggable.dragEl) {
+			if (dnd.active.dragEl) {
 				///evt = evt.touches ? evt.touches[0] : evt;
 				var nearest = dnd._detectNearestEmptySortable(evt.clientX, evt.clientY);
 
@@ -139,8 +139,8 @@ define([
 		},
 
 		_checkAlignment : function(evt) {
-			if (!dnd.draggable.dragEl || !dnd.draggable.dragEl.parentNode) return;
-			dnd.draggable._computeIsAligned(evt);
+			if (!dnd.active.dragEl || !dnd.active.dragEl.parentNode) return;
+			dnd.active._computeIsAligned(evt);
 		},
 
 
