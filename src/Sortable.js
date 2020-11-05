@@ -15,8 +15,10 @@ define([
 	"skylark-domx-layouts/oriented",
     "skylark-domx-plugins",
 	"skylark-devices-points/touch",
+	"./fallback/autoscroll",
 	"./containers",
-	"./dnd"
+	"./dnd",
+	"./fallback/ghoster"
 ],function(
 	skylark,
 	langx,
@@ -34,8 +36,10 @@ define([
 	oriented,
 	plugins,
 	touch,
+	autoscroll,
 	containers,
-	dnd
+	dnd,
+	ghoster,
 ){
 
 	'use strict';
@@ -44,44 +48,6 @@ define([
         scrolling,
 
         savedInputChecked = [];
-
-
-	 function _ghostIsLast(evt, axis, el) {
-		var elRect = geom.boundingRect(finder.lastChild(el,{ignoreHidden : true,excluding : []})),
-			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
-			mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
-			targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
-			targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
-			targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
-			spacer = 10;
-
-		return (
-			axis === 'vertical' ?
-				(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
-				(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
-		);
-	}
-
-	/**
-	 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
-	 * @param  {HTMLElement} el       Parent element
-	 * @return {HTMLElement}          The last child, ignoring ghostEl
-	 */
-	function _lastChild(el) {
-		/*
-		var last = el.lastElementChild;
-
-		while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
-			last = last.previousElementSibling;
-		}
-
-		return last || null;
-		*/
-		return finder.lastChild(el,{
-			ignoreHidden : true,
-			excluding : [null]
-		})
-	}
 
 
     function _find(ctx, tagName, iterator) {
@@ -679,7 +645,6 @@ define([
                 this._nulling();
             }
         },
-
         _onDragEnd: function (/**Event*/evt) {
             var el = this._elm,
                 options = this.options,
@@ -694,7 +659,10 @@ define([
             //clearInterval(this._loopId);
 
             //clearInterval(pointerElemChangedInterval);
-
+            autoscroll._nulling();
+            
+            autoscroll._clearAutoScrolls();
+            autoscroll._cancelThrottle();
 
             clearTimeout(this._dragStartTimer);
 
@@ -806,7 +774,7 @@ define([
 		_getDirection: function(evt, target) {
 			var  dragEl = dnd.draggable.dragEl;
 
-			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,null) : this.options.direction;
+			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,ghoster.ghostEl) : this.options.direction;
 		},
 
 
@@ -1087,9 +1055,9 @@ define([
 					return completed(true);
 				}
 
-				var elLastChild = _lastChild(el);
+				var elLastChild = ghoster._lastChild(el);
 
-				if (!elLastChild || _ghostIsLast(evt, axis, el) && !elLastChild.animated) {
+				if (!elLastChild || ghoster._ghostIsLast(evt, axis, el) && !elLastChild.animated) {
 					// assign target only if condition is true
 					if (elLastChild && el === evt.target) {
 						target = elLastChild;
@@ -1115,7 +1083,6 @@ define([
 					}
 				}
 				else if (target && target !== dragEl && target.parentNode === el) {
-					/*
 					var direction = 0,
 						targetBeforeFirstSwap,
 						aligned = target.sortableMouseAligned,
@@ -1158,9 +1125,6 @@ define([
 						lastMode = 'insert';
 					}
 					if (direction === 0) return completed(false);
-					*/
-
-					var direction = 1;
 
 					realDragElRect = null;
 					lastTarget = target;
@@ -1197,16 +1161,16 @@ define([
 						}
 
 						// Undo chrome's scroll adjustment
-						//if (scrolledPastTop) {
-						//	geom.scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
-						//}
+						if (scrolledPastTop) {
+							geom.scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
+						}
 
 						dnd.parentEl = dragEl.parentNode; // actualization
 
 						// must be done before animation
-						//if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
-						//	targetMoveDistance =  Math.abs(targetBeforeFirstSwap - geom.boundingRect(target)[side1]);
-						//}
+						if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
+							targetMoveDistance =  Math.abs(targetBeforeFirstSwap - geom.boundingRect(target)[side1]);
+						}
 						changed();
 
 						return completed(true);
@@ -1275,7 +1239,7 @@ define([
 					!options.dropBubble && evt.stopPropagation();
 				}
 
-				//ghoster.remove();
+				ghoster.remove();
 
 				if (rootEl === parentEl || (putSortable && putSortable.lastPutMode !== 'clone')) {
 					// Remove clone
@@ -1448,7 +1412,7 @@ define([
 			startDraggableIndex, newDraggableIndex,
 			originalEvt
 		) {
-			sortable = (sortable || rootEl[expando]);
+			sortable = (sortable || rootEl[dnd.expando]);
 			var evt,
 				options = sortable.options,
 				onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1),

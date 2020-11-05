@@ -1,8 +1,6 @@
 define([
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
 	"skylark-domx-query",
 	"skylark-domx-browser",
 	"skylark-domx-noder",
@@ -11,15 +9,10 @@ define([
 	"skylark-domx-styler",
 	"skylark-domx-eventer",
 	"skylark-domx-transforms",
-	"skylark-domx-scrolls/scrollingElement",
-	"skylark-domx-layouts/oriented",
-	"skylark-devices-points/touch",
 	"./dnd"
 ],function(
 	skylark,
 	langx,
-	isBrowser,
-	isMobile,
 	$,
 	browser,
 	noder,
@@ -28,9 +21,6 @@ define([
 	styler,
 	eventer,
 	transforms,
-	scrollingElement,
-	oriented,
-	touch,
 	dnd
 ){
     'use strict';

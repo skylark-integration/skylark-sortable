@@ -88,6 +88,44 @@ define([
 		ghostRelativeParent : null,
 		ghostRelativeParentInitialScroll : [], // (left, top)
 
+		_ghostIsLast : function (evt, axis, el) {
+			var elRect = geom.boundingRect(finder.lastChild(el,{ignoreHidden : true,excluding : [this.ghostEl]})),
+				mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
+				mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
+				targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
+				targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
+				targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
+				spacer = 10;
+
+			return (
+				axis === 'vertical' ?
+					(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
+					(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
+			);
+		},
+
+
+		/**
+		 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
+		 * @param  {HTMLElement} el       Parent element
+		 * @return {HTMLElement}          The last child, ignoring ghostEl
+		 */
+		_lastChild : function (el) {
+			/*
+			var last = el.lastElementChild;
+
+			while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
+				last = last.previousElementSibling;
+			}
+
+			return last || null;
+			*/
+			return finder.lastChild(el,{
+				ignoreHidden : true,
+				excluding : [this.ghostEl]
+			})
+		},
+
 		_appendGhost: function (dragEl,container,options) {
 			// Bug if using scale(): https://stackoverflow.com/questions/2637058
 			// Not being adjusted for
