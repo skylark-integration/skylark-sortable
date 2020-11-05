@@ -1071,7 +1071,13 @@ define('skylark-sortable/dnd',[
 		sortables : [],
 
 
+		rootEl : null,
 		cloneEl : null,
+		nextEl : null,
+		parentEl : null,
+
+		oldIndex : null,
+
 
 		ignoreNextClick : false,
         awaitingDragStarted : false,
@@ -2062,8 +2068,6 @@ define('skylark-sortable/Sortable',[
 			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,null) : this.options.direction;
 		},
 
-
-
 		_animate: function (prevRect, target) {
 			var ms = this.options.animation,
 				dragEl = dnd.active.dragEl;
@@ -2691,23 +2695,29 @@ define('skylark-sortable/Sortable',[
 
 
 		_dispatchEvent : function (
-			sortable, rootEl, name,
-			targetEl, toEl, fromEl,
-			startIndex, newIndex,
-			startDraggableIndex, newDraggableIndex,
+			sortable, 
+			rootEl, 
+			name,
+			targetEl, 
+			toEl, 
+			fromEl,
+			startIndex, 
+			newIndex,
+			startDraggableIndex, 
+			newDraggableIndex,
 			originalEvt
 		) {
 			sortable = (sortable || rootEl[dnd.expando]);
 			var evt,
 				options = sortable.options,
 				onName = 'on' + name.charAt(0).toUpperCase() + name.substr(1),
-				putSortable = this.putSortable;
+				putSortable = dnd.putSortable;
 
 			evt = eventer.create(name,{
 				to : toEl || rootEl,
 				from : fromEl || rootEl,
 				item : targetEl || rootEl,
-				clone : this.cloneEl,
+				clone : dnd.cloneEl,
 				oldIndex : startIndex,
 				newIndex : newIndex,
 				oldDraggableIndex : startDraggableIndex,
@@ -2830,8 +2840,6 @@ define('skylark-sortable/Sortable',[
 			Array.prototype.forEach.call(el.querySelectorAll('[draggable]'), function (el) {
 				el.removeAttribute('draggable');
 			});
-
-			this._onDrop();
 
 			dnd.sortables.splice(dnd.sortables.indexOf(this.el), 1);
 

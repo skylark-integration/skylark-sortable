@@ -40,7 +40,13 @@ define([
 		sortables : [],
 
 
+		rootEl : null,
 		cloneEl : null,
+		nextEl : null,
+		parentEl : null,
+
+		oldIndex : null,
+
 
 		ignoreNextClick : false,
         awaitingDragStarted : false,
