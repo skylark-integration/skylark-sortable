@@ -14,7 +14,6 @@ define([
 	"skylark-domx-scrolls/scrollingElement",
 	"skylark-domx-layouts/oriented",
 	"skylark-devices-points/touch",
-	"./autoscroll",
 	"./dnd"
 ],function(
 	skylark,
@@ -32,7 +31,6 @@ define([
 	scrollingElement,
 	oriented,
 	touch,
-	autoscroll,
 	dnd
 ){
     'use strict';

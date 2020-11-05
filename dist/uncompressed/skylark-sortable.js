@@ -262,7 +262,7 @@ define('skylark-langx-hoster/isBrowser',[
     return hoster.isBrowser;
 });
 
-define('skylark-sortable/autoscroll',[
+define('skylark-sortable/fallback/autoscroll',[
 	"skylark-langx/langx",
 	"skylark-langx-hoster/isBrowser",
 	"skylark-domx-geom",
@@ -753,44 +753,6 @@ define('skylark-sortable/fallback/ghoster',[
 		ghostRelativeParent : null,
 		ghostRelativeParentInitialScroll : [], // (left, top)
 
-		_ghostIsLast : function (evt, axis, el) {
-			var elRect = geom.boundingRect(finder.lastChild(el,{ignoreHidden : true,excluding : [this.ghostEl]})),
-				mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
-				mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
-				targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
-				targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
-				targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
-				spacer = 10;
-
-			return (
-				axis === 'vertical' ?
-					(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
-					(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
-			);
-		},
-
-
-		/**
-		 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
-		 * @param  {HTMLElement} el       Parent element
-		 * @return {HTMLElement}          The last child, ignoring ghostEl
-		 */
-		_lastChild : function (el) {
-			/*
-			var last = el.lastElementChild;
-
-			while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
-				last = last.previousElementSibling;
-			}
-
-			return last || null;
-			*/
-			return finder.lastChild(el,{
-				ignoreHidden : true,
-				excluding : [this.ghostEl]
-			})
-		},
-
 		_appendGhost: function (dragEl,container,options) {
 			// Bug if using scale(): https://stackoverflow.com/questions/2637058
 			// Not being adjusted for
@@ -896,6 +858,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 	"skylark-domx-eventer",
 	"skylark-domx-styler",
 	"skylark-domx-transforms",
+	"./autoscroll",
 	"./ghoster"
 ],function(
 	langx,
@@ -903,6 +866,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 	eventer,
 	styler,
 	transforms,
+	autoscroll,
 	ghoster
 ){
 	var MousedDragDrop = langx.Emitter.inherit({
@@ -968,7 +932,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 
                 }
 
-                !forAutoScroll && dnd._handleAutoScroll(touch, true);
+                !forAutoScroll && this._handleAutoScroll(touch, true);
 
                 ///moved = true;
                 dnd.touchEvt = touch;
@@ -1039,11 +1003,24 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 		},
 
 
+		_handleAutoScroll: function(evt, fallback) {
+			var dnd = this.dnd;
+
+			if (!dnd.draggable.dragEl || !dnd.draggable.options.scroll) return;
+
+			return autoscroll._handleAutoScroll(evt,dnd.draggable.options,fallback,dnd.expando);
+		},
+
+
 		destroy : function() {
 			this.unlistenTo();
         	if (this._loopId) {
         		clearInterval(this._loopId);
         	}
+            autoscroll._nulling();
+            
+            autoscroll._clearAutoScrolls();
+            autoscroll._cancelThrottle();
 
 		}
 	});
@@ -1053,8 +1030,6 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 define('skylark-sortable/dnd',[
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
 	"skylark-domx-query",
 	"skylark-domx-browser",
 	"skylark-domx-noder",
@@ -1062,17 +1037,10 @@ define('skylark-sortable/dnd',[
 	"skylark-domx-geom",
 	"skylark-domx-styler",
 	"skylark-domx-eventer",
-	"skylark-domx-transforms",
-	"skylark-domx-scrolls/scrollingElement",
-	"skylark-domx-layouts/oriented",
-	"skylark-devices-points/touch",
-	"./autoscroll",
 	"./fallback/MousedDragDrop"
 ],function(
 	skylark,
 	langx,
-	isBrowser,
-	isMobile,
 	$,
 	browser,
 	noder,
@@ -1080,11 +1048,6 @@ define('skylark-sortable/dnd',[
 	geom,
 	styler,
 	eventer,
-	transforms,
-	scrollingElement,
-	oriented,
-	touch,
-	autoscroll,
 	MousedDragDrop
 ){
     'use strict';
@@ -1214,14 +1177,6 @@ define('skylark-sortable/dnd',[
 			el.draggable = false;
 		},
 
-		_handleAutoScroll: function(evt, fallback) {
-
-			if (!dnd.draggable.dragEl || !dnd.draggable.options.scroll) return;
-
-			return autoscroll._handleAutoScroll(evt,dnd.draggable.options,fallback,expando);
-		},
-
-
 		_nulling: function() {
 
 			dnd.rootEl =
@@ -1266,7 +1221,6 @@ define('skylark-sortable/containers',[
 	"skylark-domx-scrolls/scrollingElement",
 	"skylark-domx-layouts/oriented",
 	"skylark-devices-points/touch",
-	"./autoscroll",
 	"./dnd"
 ],function(
 	skylark,
@@ -1284,7 +1238,6 @@ define('skylark-sortable/containers',[
 	scrollingElement,
 	oriented,
 	touch,
-	autoscroll,
 	dnd
 ){
     'use strict';
@@ -1360,10 +1313,8 @@ define('skylark-sortable/Sortable',[
 	"skylark-domx-layouts/oriented",
     "skylark-domx-plugins",
 	"skylark-devices-points/touch",
-	"./autoscroll",
 	"./containers",
-	"./dnd",
-	"./fallback/ghoster"
+	"./dnd"
 ],function(
 	skylark,
 	langx,
@@ -1381,10 +1332,8 @@ define('skylark-sortable/Sortable',[
 	oriented,
 	plugins,
 	touch,
-	autoscroll,
 	containers,
-	dnd,
-	ghoster,
+	dnd
 ){
 
 	'use strict';
@@ -1393,6 +1342,44 @@ define('skylark-sortable/Sortable',[
         scrolling,
 
         savedInputChecked = [];
+
+
+	 function _ghostIsLast(evt, axis, el) {
+		var elRect = geom.boundingRect(finder.lastChild(el,{ignoreHidden : true,excluding : []})),
+			mouseOnAxis = axis === 'vertical' ? evt.clientY : evt.clientX,
+			mouseOnOppAxis = axis === 'vertical' ? evt.clientX : evt.clientY,
+			targetS2 = axis === 'vertical' ? elRect.bottom : elRect.right,
+			targetS1Opp = axis === 'vertical' ? elRect.left : elRect.top,
+			targetS2Opp = axis === 'vertical' ? elRect.right : elRect.bottom,
+			spacer = 10;
+
+		return (
+			axis === 'vertical' ?
+				(mouseOnOppAxis > targetS2Opp + spacer || mouseOnOppAxis <= targetS2Opp && mouseOnAxis > targetS2 && mouseOnOppAxis >= targetS1Opp) :
+				(mouseOnAxis > targetS2 && mouseOnOppAxis > targetS1Opp || mouseOnAxis <= targetS2 && mouseOnOppAxis > targetS2Opp + spacer)
+		);
+	}
+
+	/**
+	 * Gets the last child in the el, ignoring ghostEl or invisible elements (clones)
+	 * @param  {HTMLElement} el       Parent element
+	 * @return {HTMLElement}          The last child, ignoring ghostEl
+	 */
+	function _lastChild(el) {
+		/*
+		var last = el.lastElementChild;
+
+		while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
+			last = last.previousElementSibling;
+		}
+
+		return last || null;
+		*/
+		return finder.lastChild(el,{
+			ignoreHidden : true,
+			excluding : [null]
+		})
+	}
 
 
     function _find(ctx, tagName, iterator) {
@@ -1990,6 +1977,7 @@ define('skylark-sortable/Sortable',[
                 this._nulling();
             }
         },
+
         _onDragEnd: function (/**Event*/evt) {
             var el = this._elm,
                 options = this.options,
@@ -2004,10 +1992,7 @@ define('skylark-sortable/Sortable',[
             //clearInterval(this._loopId);
 
             //clearInterval(pointerElemChangedInterval);
-            autoscroll._nulling();
-            
-            autoscroll._clearAutoScrolls();
-            autoscroll._cancelThrottle();
+
 
             clearTimeout(this._dragStartTimer);
 
@@ -2119,7 +2104,7 @@ define('skylark-sortable/Sortable',[
 		_getDirection: function(evt, target) {
 			var  dragEl = dnd.draggable.dragEl;
 
-			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,ghoster.ghostEl) : this.options.direction;
+			return (typeof this.options.direction === 'function') ? this.options.direction.call(this, evt, target, dragEl,null) : this.options.direction;
 		},
 
 
@@ -2400,9 +2385,9 @@ define('skylark-sortable/Sortable',[
 					return completed(true);
 				}
 
-				var elLastChild = ghoster._lastChild(el);
+				var elLastChild = _lastChild(el);
 
-				if (!elLastChild || ghoster._ghostIsLast(evt, axis, el) && !elLastChild.animated) {
+				if (!elLastChild || _ghostIsLast(evt, axis, el) && !elLastChild.animated) {
 					// assign target only if condition is true
 					if (elLastChild && el === evt.target) {
 						target = elLastChild;
@@ -2428,6 +2413,7 @@ define('skylark-sortable/Sortable',[
 					}
 				}
 				else if (target && target !== dragEl && target.parentNode === el) {
+					/*
 					var direction = 0,
 						targetBeforeFirstSwap,
 						aligned = target.sortableMouseAligned,
@@ -2470,6 +2456,9 @@ define('skylark-sortable/Sortable',[
 						lastMode = 'insert';
 					}
 					if (direction === 0) return completed(false);
+					*/
+
+					var direction = 1;
 
 					realDragElRect = null;
 					lastTarget = target;
@@ -2506,16 +2495,16 @@ define('skylark-sortable/Sortable',[
 						}
 
 						// Undo chrome's scroll adjustment
-						if (scrolledPastTop) {
-							geom.scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
-						}
+						//if (scrolledPastTop) {
+						//	geom.scrollBy(scrolledPastTop, 0, scrollBefore - scrolledPastTop.scrollTop);
+						//}
 
 						dnd.parentEl = dragEl.parentNode; // actualization
 
 						// must be done before animation
-						if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
-							targetMoveDistance =  Math.abs(targetBeforeFirstSwap - geom.boundingRect(target)[side1]);
-						}
+						//if (targetBeforeFirstSwap !== undefined && !isCircumstantialInvert) {
+						//	targetMoveDistance =  Math.abs(targetBeforeFirstSwap - geom.boundingRect(target)[side1]);
+						//}
 						changed();
 
 						return completed(true);
@@ -2584,7 +2573,7 @@ define('skylark-sortable/Sortable',[
 					!options.dropBubble && evt.stopPropagation();
 				}
 
-				ghoster.remove();
+				//ghoster.remove();
 
 				if (rootEl === parentEl || (putSortable && putSortable.lastPutMode !== 'clone')) {
 					// Remove clone
@@ -2935,7 +2924,7 @@ define('skylark-sortable/main',[
 	"skylark-domx-finder",
 	"skylark-domx-noder",
 	"skylark-domx-styler",
-	"./autoscroll",
+	"./fallback/autoscroll",
 	"./containers",
 	"./Sortable"
 ],function(

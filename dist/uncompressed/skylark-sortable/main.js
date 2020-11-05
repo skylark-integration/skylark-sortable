@@ -4,7 +4,7 @@ define([
 	"skylark-domx-finder",
 	"skylark-domx-noder",
 	"skylark-domx-styler",
-	"./autoscroll",
+	"./fallback/autoscroll",
 	"./containers",
 	"./Sortable"
 ],function(

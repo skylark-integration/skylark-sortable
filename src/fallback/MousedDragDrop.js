@@ -4,6 +4,7 @@ define([
 	"skylark-domx-eventer",
 	"skylark-domx-styler",
 	"skylark-domx-transforms",
+	"./autoscroll",
 	"./ghoster"
 ],function(
 	langx,
@@ -11,6 +12,7 @@ define([
 	eventer,
 	styler,
 	transforms,
+	autoscroll,
 	ghoster
 ){
 	var MousedDragDrop = langx.Emitter.inherit({
@@ -76,7 +78,7 @@ define([
 
                 }
 
-                !forAutoScroll && dnd._handleAutoScroll(touch, true);
+                !forAutoScroll && this._handleAutoScroll(touch, true);
 
                 ///moved = true;
                 dnd.touchEvt = touch;
@@ -147,11 +149,24 @@ define([
 		},
 
 
+		_handleAutoScroll: function(evt, fallback) {
+			var dnd = this.dnd;
+
+			if (!dnd.draggable.dragEl || !dnd.draggable.options.scroll) return;
+
+			return autoscroll._handleAutoScroll(evt,dnd.draggable.options,fallback,dnd.expando);
+		},
+
+
 		destroy : function() {
 			this.unlistenTo();
         	if (this._loopId) {
         		clearInterval(this._loopId);
         	}
+            autoscroll._nulling();
+            
+            autoscroll._clearAutoScrolls();
+            autoscroll._cancelThrottle();
 
 		}
 	});

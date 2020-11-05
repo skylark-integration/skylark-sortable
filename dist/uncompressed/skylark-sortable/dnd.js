@@ -1,8 +1,6 @@
 define([
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
 	"skylark-domx-query",
 	"skylark-domx-browser",
 	"skylark-domx-noder",
@@ -10,17 +8,10 @@ define([
 	"skylark-domx-geom",
 	"skylark-domx-styler",
 	"skylark-domx-eventer",
-	"skylark-domx-transforms",
-	"skylark-domx-scrolls/scrollingElement",
-	"skylark-domx-layouts/oriented",
-	"skylark-devices-points/touch",
-	"./autoscroll",
 	"./fallback/MousedDragDrop"
 ],function(
 	skylark,
 	langx,
-	isBrowser,
-	isMobile,
 	$,
 	browser,
 	noder,
@@ -28,11 +19,6 @@ define([
 	geom,
 	styler,
 	eventer,
-	transforms,
-	scrollingElement,
-	oriented,
-	touch,
-	autoscroll,
 	MousedDragDrop
 ){
     'use strict';
@@ -161,14 +147,6 @@ define([
 		_disableDraggable : function (el) {
 			el.draggable = false;
 		},
-
-		_handleAutoScroll: function(evt, fallback) {
-
-			if (!dnd.draggable.dragEl || !dnd.draggable.options.scroll) return;
-
-			return autoscroll._handleAutoScroll(evt,dnd.draggable.options,fallback,expando);
-		},
-
 
 		_nulling: function() {
 
