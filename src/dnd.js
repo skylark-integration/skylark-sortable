@@ -83,15 +83,15 @@ define([
 			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
 
 			if (this.draggable.nativeDraggable) {
-                eventer.on(document, 'dragover', this._handleAutoScroll);
+                ///eventer.on(document, 'dragover', this._handleAutoScroll);
                 eventer.on(document, 'dragover', this._checkAlignment);
             } else {
-                eventer.on(document, 'mousemove', this._handleAutoScroll);
+                ///eventer.on(document, 'mousemove', this._handleAutoScroll);
             }
         },
 
         over : function(evt) {
-			this._handleAutoScroll(evt);
+			//this._handleAutoScroll(evt);
         },
 
         end: function(dropped) {
@@ -99,11 +99,11 @@ define([
 	  		///eventer.off(document, 'mousemove', this.nearestEmptyInsertDetectEvent);
 	
 			if (this.draggable.nativeDraggable) {
-				eventer.off(document, 'dragover', this._handleAutoScroll);
+				///eventer.off(document, 'dragover', this._handleAutoScroll);
 				eventer.off(document, 'dragover', this._checkAlignment);
 			} else {
 		        // Unbind events
-	            eventer.off(document, 'mousemove', this._onTouchMove);
+	            ///eventer.off(document, 'mousemove', this._onTouchMove);
 
 			}
 
