@@ -43,7 +43,7 @@ define([
             var dnd = this.dnd,
             	ghostEl = ghoster.ghostEl,
             	draggable = dnd.active,
-            	dragEl = draggable.dragEl,
+            	dragEl = dnd.dragEl,
             	tapEvt = dnd.tapEvt;
             if (tapEvt) {
                 var options =  draggable.options,
@@ -100,7 +100,7 @@ define([
 
 		_emulateDragOver: function (forAutoScroll) {
 			var dnd = this.dnd,
-				dragEl = dnd.active.dragEl,
+				dragEl = dnd.dragEl,
 				touchEvt = dnd.touchEvt;
 
 			if (touchEvt) {
@@ -154,7 +154,7 @@ define([
 		_handleAutoScroll: function(evt, fallback) {
 			var dnd = this.dnd;
 
-			if (!dnd.active.dragEl || !dnd.active.options.scroll) return;
+			if (!dnd.dragEl || !dnd.active.options.scroll) return;
 
 			return autoscroll._handleAutoScroll(evt,dnd.active.options,fallback,dnd.expando);
 		},

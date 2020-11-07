@@ -41,6 +41,7 @@ define([
 
 
 		rootEl : null,
+		dragEl : null,
 		cloneEl : null,
 		nextEl : null,
 		parentEl : null,
@@ -74,12 +75,12 @@ define([
 			///eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
 			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
 
-			if (this.active.nativeDraggable) {
+			///if (this.active.nativeDraggable) {
                 ///eventer.on(document, 'dragover', this._handleAutoScroll);
                // eventer.on(document, 'dragover', this._checkAlignment);
-            } else {
+            //} else {
                 ///eventer.on(document, 'mousemove', this._handleAutoScroll);
-            }
+            //}
         },
 
         over : function(evt) {
@@ -90,20 +91,20 @@ define([
 	  		//eventer.off(document, 'dragover', this.nearestEmptyInsertDetectEvent);
 	  		///eventer.off(document, 'mousemove', this.nearestEmptyInsertDetectEvent);
 	
-			if (this.active.nativeDraggable) {
+			//if (this.active.nativeDraggable) {
 				///eventer.off(document, 'dragover', this._handleAutoScroll);
 				//eventer.off(document, 'dragover', this._checkAlignment);
-			} else {
+			//} else {
 		        // Unbind events
 	            ///eventer.off(document, 'mousemove', this._onTouchMove);
 
-			}
+			//}
 
         	this._nulling();
  		},
 
 		nearestEmptyInsertDetectEvent :function (evt) {
-			if (dnd.active.dragEl) {
+			if (dnd.dragEl) {
 				///evt = evt.touches ? evt.touches[0] : evt;
 				var nearest = dnd._detectNearestEmptySortable(evt.clientX, evt.clientY);
 
@@ -145,7 +146,7 @@ define([
 		},
 
 		_checkAlignment : function(evt) {
-			if (!dnd.active.dragEl || !dnd.active.dragEl.parentNode) return;
+			if (!dnd.dragEl || !dnd.dragEl.parentNode) return;
 			dnd.active._computeIsAligned(evt);
 		},
 
@@ -156,6 +157,7 @@ define([
 
 		_nulling: function() {
 
+			dnd.dragEl = 
 			dnd.rootEl =
 			dnd.parentEl =
 			//ghoster.ghostEl =

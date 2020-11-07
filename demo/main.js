@@ -230,7 +230,7 @@ requirejs.config({
           {
             name: 'skylark-sortable',
             location : "../src",
-           // location : "../dist/uncompressed/skylark-sortable-01",
+            //location : "../dist/uncompressed/skylark-sortable-5",
             main: 'main'
           }                   
         ]
