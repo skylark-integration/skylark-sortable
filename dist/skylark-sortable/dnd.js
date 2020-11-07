@@ -1,0 +1,9 @@
+/**
+ * skylark-sortable - A version of sortable.js that ported to running on skylarkjs.
+ * @author Hudaokeji, Inc.
+ * @version v0.9.0
+ * @link https://github.com/skylark-integration/skylark-sortable/
+ * @license MIT
+ */
+define(["skylark-langx/skylark","skylark-langx/langx","skylark-domx-query","skylark-domx-browser","skylark-domx-noder","skylark-domx-finder","skylark-domx-geom","skylark-domx-styler","skylark-domx-eventer","./fallback/MousedDragDrop"],function(t,e,l,n,r,a,o,i,s,c){"use strict";var d="Sortable"+(new Date).getTime(),u={log:function(t,e){l("#console").append("<div>"+t+":"+e+"</div>")},expando:d,activeGroup:null,active:null,putSortable:null,sortables:[],rootEl:null,dragEl:null,cloneEl:null,nextEl:null,parentEl:null,oldIndex:null,ignoreNextClick:!1,awaitingDragStarted:!1,touchEvt:null,prepare:function(t){this.active=t,this.active.nativeDraggable||(this._fallbacker=new c(this))},start:function(t,e){this.active=t;this.active.elm().ownerDocument},over:function(t){},end:function(t){this._nulling()},nearestEmptyInsertDetectEvent:function(t){if(u.dragEl){var e=u._detectNearestEmptySortable(t.clientX,t.clientY);if(e){var l={};for(var n in t)l[n]=t[n];l.target=l.rootEl=e,l.preventDefault=void 0,l.stopPropagation=void 0,e[d]._onDragOver(l)}}},_detectNearestEmptySortable:function(t,e){for(var l=this.sortables,n=0;n<l.length;n++)if(!a.lastChild(l[n],{ignoreHidden:!0,excluding:[this.ghostEl]})){var r=o.boundingRect(l[n]),i=l[n][d].options.emptyInsertThreshold,s=t>=r.left-i&&t<=r.right+i,c=e>=r.top-i&&e<=r.bottom+i;if(i&&s&&c)return l[n]}},_checkAlignment:function(t){u.dragEl&&u.dragEl.parentNode&&u.active._computeIsAligned(t)},_disableDraggable:function(t){t.draggable=!1},_nulling:function(){u.dragEl=u.rootEl=u.parentEl=u.nextEl=u.cloneEl=u.tapEvt=u.touchEvt=u.oldIndex=u.putSortable=u.activeGroup=u.active=null}};return u});
+//# sourceMappingURL=sourcemaps/dnd.js.map
