@@ -1096,9 +1096,9 @@ define([
 				return completed(false);
 			}
 
-			if (target !== dragEl) {
-				dnd.ignoreNextClick = false;
-			}
+			////if (target !== dragEl) {
+			////	dnd.ignoreNextClick = false;
+			////}
 
 			if (activeSortable && !options.disabled &&
 				(isOwner

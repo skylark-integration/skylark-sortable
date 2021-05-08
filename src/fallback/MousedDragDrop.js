@@ -21,7 +21,7 @@ define([
 
 			var $doc = $(document);
 
-			this.listenTo($doc,"mousemove",this._onTouchMove.bind(this));
+			this.listenTo($doc,"mousemove",this._onMouseMove.bind(this));
 			this.listenTo($doc,"mouseup",this._onMouseUp.bind(this));
 
 		},
@@ -38,8 +38,8 @@ define([
         	this.destroy();
 		},
 
-        _onTouchMove: function (/**TouchEvent*/evt, forAutoScroll) {
-            //dnd.log("_onTouchMove","start");
+        _onMouseMove: function (/**TouchEvent*/evt, forAutoScroll) {
+            //dnd.log("_onMouseMove","start");
             var dnd = this.dnd,
             	ghostEl = ghoster.ghostEl,
             	draggable = dnd.active,
@@ -73,7 +73,7 @@ define([
 
                     ghoster._appendGhost(dragEl,document.body,draggable.options);
 
-                	dnd.ignoreNextClick = true;
+                	///dnd.ignoreNextClick = true;
 
                 	this._dragStarted = true;
                 	this._loopId = setInterval(this._emulateDragOver.bind(this), 50);
@@ -83,7 +83,8 @@ define([
                 !forAutoScroll && this._handleAutoScroll(touch, true);
 
                 ///moved = true;
-                dnd.touchEvt = touch;
+                ///dnd.touchEvt = touch;
+                this.touchEvt = touch;
 
                 if (ghostEl) {
                     //styler.css(ghostEl, 'webkitTransform', translate3d);
@@ -101,7 +102,8 @@ define([
 		_emulateDragOver: function (forAutoScroll) {
 			var dnd = this.dnd,
 				dragEl = dnd.dragEl,
-				touchEvt = dnd.touchEvt;
+				///touchEvt = dnd.touchEvt;
+				touchEvt = this.touchEvt;
 
 			if (touchEvt) {
 				if (this._lastX === touchEvt.clientX && this._lastY === touchEvt.clientY && !forAutoScroll) {

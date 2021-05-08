@@ -49,11 +49,9 @@ define([
 		oldIndex : null,
 
 
-		ignoreNextClick : false,
+		///ignoreNextClick : false,
         awaitingDragStarted : false,
-
-
-		touchEvt : null,
+		///touchEvt : null,
 
         prepare: function(sortable) {
         	this.active = sortable;
@@ -167,7 +165,7 @@ define([
 
 
 			dnd.tapEvt =
-			dnd.touchEvt =
+			///dnd.touchEvt =
 
 			dnd.oldIndex =
 
