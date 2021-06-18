@@ -3,7 +3,7 @@ define([
 	"skylark-langx-hoster/isBrowser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
-	"skylark-domx-scrolls/scrollingElement"
+	"skylark-domx-plugins-scrolls/scrollingElement"
 ],function(
 	langx,
 	isBrowser,
