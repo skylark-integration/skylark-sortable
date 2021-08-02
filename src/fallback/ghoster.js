@@ -11,7 +11,7 @@ define([
 	"skylark-domx-styler",
 	"skylark-domx-eventer",
 	"skylark-domx-transforms",
-	"skylark-domx-plugins-scrolls/scrollingElement",
+	"skylark-domx-plugins-scrolls/scrolling-element",
 	"skylark-domx-layouts/oriented",
 	"skylark-devices-points/touch"
 ],function(
