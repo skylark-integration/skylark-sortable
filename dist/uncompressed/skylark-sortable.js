@@ -251,7 +251,7 @@ define('skylark-langx-hoster/detects/browser',[
 
 	return hoster.detects.browser = detectBrowser;
 });
-define('skylark-langx-hoster/isBrowser',[
+define('skylark-langx-hoster/is-browser',[
     "./hoster",
     "./detects/browser"
 ],function(hoster,detectBrowser){
@@ -264,7 +264,7 @@ define('skylark-langx-hoster/isBrowser',[
 
 define('skylark-sortable/fallback/autoscroll',[
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
+	"skylark-langx-hoster/is-browser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
 	"skylark-domx-plugins-scrolls/scrolling-element"
@@ -601,6 +601,28 @@ define('skylark-sortable/fallback/autoscroll',[
 		_nulling
 	}
 });
+define('skylark-langx-hoster/isBrowser',[
+    "./hoster",
+    "./detects/browser"
+],function(hoster,detectBrowser){
+	if (hoster.isBrowser == undefined) {
+		hoster.isBrowser = detectBrowser();
+	}
+
+    return hoster.isBrowser;
+});
+
+define('skylark-langx-hoster/isMobile',[
+    "./hoster",
+    "./detects/mobile"
+],function(hoster,detectMobile){
+    if (hoster.isMobile == undefined) {
+        hoster.isMobile = detectMobile();
+    }
+
+    return hoster.isMobile;
+});
+
 define('skylark-domx-layouts/oriented',[
 	"skylark-domx-geom",
 	"skylark-domx-styler",
@@ -666,8 +688,8 @@ define('skylark-domx-layouts/oriented',[
 define('skylark-sortable/fallback/ghoster',[
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
+	"skylark-langx-hoster/is-browser",
+	"skylark-langx-hoster/is-mobile",
 	"skylark-domx-query",
 	"skylark-domx-browser",
 	"skylark-domx-noder",

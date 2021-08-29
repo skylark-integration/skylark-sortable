@@ -1,8 +1,8 @@
 define([
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
+	"skylark-langx-hoster/is-browser",
+	"skylark-langx-hoster/is-mobile",
 	"skylark-domx-query",
 	"skylark-domx-browser",
 	"skylark-domx-noder",

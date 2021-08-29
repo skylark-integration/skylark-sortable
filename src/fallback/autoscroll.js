@@ -1,6 +1,6 @@
 define([
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
+	"skylark-langx-hoster/is-browser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
 	"skylark-domx-plugins-scrolls/scrolling-element"
