@@ -601,28 +601,6 @@ define('skylark-sortable/fallback/autoscroll',[
 		_nulling
 	}
 });
-define('skylark-langx-hoster/isBrowser',[
-    "./hoster",
-    "./detects/browser"
-],function(hoster,detectBrowser){
-	if (hoster.isBrowser == undefined) {
-		hoster.isBrowser = detectBrowser();
-	}
-
-    return hoster.isBrowser;
-});
-
-define('skylark-langx-hoster/isMobile',[
-    "./hoster",
-    "./detects/mobile"
-],function(hoster,detectMobile){
-    if (hoster.isMobile == undefined) {
-        hoster.isMobile = detectMobile();
-    }
-
-    return hoster.isMobile;
-});
-
 define('skylark-domx-layouts/oriented',[
 	"skylark-domx-geom",
 	"skylark-domx-styler",
@@ -1240,8 +1218,8 @@ define('skylark-sortable/dnd',[
 define('skylark-sortable/Sortable',[
 	"skylark-langx/skylark",
 	"skylark-langx/langx",
-	"skylark-langx-hoster/isBrowser",
-	"skylark-langx-hoster/isMobile",
+	"skylark-langx-hoster/is-browser",
+	"skylark-langx-hoster/is-mobile",
 	"skylark-domx-query",
 	"skylark-domx-browser",
 	"skylark-domx-noder",
