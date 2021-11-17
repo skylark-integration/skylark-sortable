@@ -562,68 +562,24 @@ define([
                 dragEl.style.transition = '';
                 dragEl.style.transform = '';
 
-                dragStartFn = function () {
-                    if ( _this.nativeDraggable) {
-                        dragEl.draggable = true;
-                    }
-
-                    // Bind the events: dragstart/dragend
-                    _this._triggerDragStart(evt, touch);
-
-                    // Drag start event
-                    _this._dispatchEvent(_this, rootEl, 'choose', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex);
-
-                    // Chosen item
-                    styler.toggleClass(dragEl, options.chosenClass, true);
-                };
-
                 // Disable "draggable"
                 options.ignore.split(',').forEach(function (criteria) {
                     _find(dragEl, criteria.trim(), dnd._disableDraggable);
                 });
 
-                //eventer.on(ownerDocument, 'mouseup', _this._onDrop); // TODO : lwf
-                ///eventer.on(ownerDocument, 'touchend', _this._onDrop);
-                ///eventer.on(ownerDocument, 'touchcancel', _this._onDrop);
+                // Bind the events: dragstart/dragend
+                ///_this._triggerDragStart(evt, touch);
 
-                // Make dragEl draggable (must be before delay for FireFox)
-                ///if (FireFox && this.nativeDraggable) {
-                if (this.nativeDraggable) {
-                   this.options.touchStartThreshold = 4;
-                    dragEl.draggable = true;
-                }
+                dnd.prepare(this,dnd.dragEl);
 
-                dragStartFn();
+                // Drag start event
+                _this._dispatchEvent(_this, rootEl, 'choose', dragEl, rootEl, rootEl, oldIndex, undefined, oldDraggableIndex);
+
+                // Chosen item
+                styler.toggleClass(dragEl, options.chosenClass, true);
             }
         },
 
-        //native dnd mode : register _OnDragStart for dragstart event handler 
-        //moused dnd mode : register  _onTouchMove for mousemove event hander, _onTouchMove calls _OnDragStart
-        _triggerDragStart: function (/** Event */evt, /** Touch */touch) {
-            dnd.log("_triggerDragStart","start");
-            dnd.log("_triggerDragStart","nativeDraggable is " +  this.nativeDraggable);
-
-            dnd.prepare(this);
-
-            if (!this.nativeDraggable) {
-                ////eventer.on(document, 'mousemove', this._onTouchMove);
-            } else {
-                eventer.on(dnd.dragEl, 'dragend', this._onDragEnd);
-                eventer.on(dnd.dragEl, 'dragstart', this._onDragStart);
-            }
-
-            try {
-                if (document.selection) {
-                    // Timeout neccessary for IE9
-                    langx.defer(function () {
-                        document.selection.empty();
-                    });
-                } else {
-                    window.getSelection().removeAllRanges();
-                }
-            } catch (err) {
-            }
-        },
 
         _onDragStart: function (/**Event*/evt, /**boolean*/fallback) {
             dnd.log("_onDragStart","start");
@@ -744,12 +700,12 @@ define([
 
 
             if (this._cloneId) {
-                this._cloneId.stop();
+                this._cloneId.cancel();
                 this._cloneId = null;
             }
 
             if (this._dragStartId) {
-                this._dragStartId.stop();
+                this._dragStartId.cancel();
                 this._dragStartId = null;
             }
 

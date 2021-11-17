@@ -53,10 +53,34 @@ define([
         awaitingDragStarted : false,
 		///touchEvt : null,
 
-        prepare: function(sortable) {
+        prepare: function(sortable,dragEl) {
         	this.active = sortable;
+        	this.dragEl = dragEl;
             if (!this.active.nativeDraggable) {
             	this._fallbacker = new MousedDragDrop(this);
+            } else {
+            	dragEl.draggable = true;
+                eventer.on(dnd.dragEl, 'dragend', (e)=>{
+                	this.active._onDragEnd(e)
+                });
+                eventer.on(dnd.dragEl, 'dragstart', (e)=>{
+                	this.active._onDragStart(e)
+                });
+            }
+
+            dnd.log("_triggerDragStart","start");
+            dnd.log("_triggerDragStart","nativeDraggable is " +  this.active.nativeDraggable);
+
+            try {
+                if (document.selection) {
+                    // Timeout neccessary for IE9
+                    langx.defer(function () {
+                        document.selection.empty();
+                    });
+                } else {
+                    window.getSelection().removeAllRanges();
+                }
+            } catch (err) {
             }
 
 		},
