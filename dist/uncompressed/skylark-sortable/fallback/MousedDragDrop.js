@@ -31,8 +31,8 @@ define([
         	if (dnd.putSortable) {
         		dnd.putSortable._onDrop(evt)
         	}
-        	if (dnd.active) {
-        		dnd.active._onDragEnd(evt);
+        	if (dnd.dragging) {
+        		dnd.dragging._onDragEnd(evt);
         	}
         	ghoster.remove();
         	this.destroy();

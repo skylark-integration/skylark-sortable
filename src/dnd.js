@@ -53,18 +53,20 @@ define([
         awaitingDragStarted : false,
 		///touchEvt : null,
 
-        prepare: function(sortable,dragEl) {
-        	this.active = sortable;
+        prepare: function(draggable,dragEl) {
+        	this.dragging = draggable;
+        	this.active = draggable.sortable;
+
         	this.dragEl = dragEl;
             if (!this.active.nativeDraggable) {
             	this._fallbacker = new MousedDragDrop(this);
             } else {
             	dragEl.draggable = true;
                 eventer.on(dnd.dragEl, 'dragend', (e)=>{
-                	this.active._onDragEnd(e)
+                	this.dragging._onDragEnd(e)
                 });
                 eventer.on(dnd.dragEl, 'dragstart', (e)=>{
-                	this.active._onDragStart(e)
+                	this.dragging._onDragStart(e)
                 });
             }
 
@@ -85,12 +87,12 @@ define([
 
 		},
 
-        start: function(sortable, event) {
-        	this.active = sortable;
+        start: function(draggable, event) {
+        	this.dragging = draggable;
+        	this.active = draggable.sortable;
 
-
-			var el = this.active.elm(),
-				ownerDocument = el.ownerDocument;
+			//var el = this.active.elm(),
+			//	ownerDocument = el.ownerDocument;
 
 
 			//eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
