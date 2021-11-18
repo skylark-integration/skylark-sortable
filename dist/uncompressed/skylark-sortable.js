@@ -896,7 +896,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
             //dnd.log("_onMouseMove","start");
             var dnd = this.dnd,
             	ghostEl = ghoster.ghostEl,
-            	draggable = dnd.active,
+            	draggable = dnd.dragging,
             	dragEl = dnd.dragEl,
             	tapEvt = dnd.tapEvt;
             if (tapEvt) {
@@ -1724,15 +1724,6 @@ define('skylark-sortable/Sortable',[
 	 * @return {HTMLElement}          The last child, ignoring ghostEl
 	 */
 	 function _lastChild(el) {
-		/*
-		var last = el.lastElementChild;
-
-		while (last && (last === ghostEl || styler.css(last, 'display') === 'none')) {
-			last = last.previousElementSibling;
-		}
-
-		return last || null;
-		*/
 		return finder.lastChild(el,{
 			ignoreHidden : true,
 			excluding : []
@@ -1796,14 +1787,7 @@ define('skylark-sortable/Sortable',[
 			passive: false
 		},
 
-		/*
-		IE11OrLess = !!navigator.userAgent.match(/(?:Trident.*rv[ :]?11\.|msie|iemobile)/i),
-		Edge = !!navigator.userAgent.match(/Edge/i),
-		FireFox = !!navigator.userAgent.match(/firefox/i),
-		Safari = !!(navigator.userAgent.match(/safari/i) && !navigator.userAgent.match(/chrome/i) && !navigator.userAgent.match(/android/i)),
 
-		IOS = !!(navigator.userAgent.match(/iP(ad|od|hone)/i)),
-		*/
 		IE11OrLess = isBrowser && isBrowser.ie,
 		Edge = isBrowser && isBrowser.edge,
 		FireFox = isBrowser && isBrowser.firefox,
@@ -1811,22 +1795,10 @@ define('skylark-sortable/Sortable',[
 
 		IOS = isMobile && isMobile.apple.device,
 
-		//CSSFloatProperty = Edge || IE11OrLess ? 'cssFloat' : 'float',
-
 		// This will not pass for IE9, because IE9 DnD only works on anchors
 		supportDraggable = ('draggable' in document.createElement('div')) && !isMobile.apple.device,
 
-		/*
-		supportCssPointerEvents = (function() {
-			// false when <= IE11
-			if (IE11OrLess) {
-				return false;
-			}
-			var el = document.createElement('x');
-			el.style.cssText = 'pointer-events:auto';
-			return el.style.pointerEvents === 'auto';
-		})(),
-		*/
+
 		supportCssPointerEvents = browser.support.cssPointerEvents,
 
 		_silent = false,
@@ -1876,42 +1848,6 @@ define('skylark-sortable/Sortable',[
 
 			options.group = group;
 		};
-
-
-		//_hideGhostForTarget = function() {
-		//	if (!supportCssPointerEvents && ghostEl) {
-		//		styler.css(ghostEl, 'display', 'none');
-		//	}
-		//},
-
-		//_unhideGhostForTarget = function() {
-		//	if (!supportCssPointerEvents && ghostEl) {
-		//		styler.css(ghostEl, 'display', '');
-		//	}
-		//};
-
-
-	/*
-
-	// #1184 fix - Prevent click event on fallback if dragged but item not changed position
-	document.addEventListener('click', function(evt) {
-		if (ignoreNextClick) {
-			evt.preventDefault();
-			evt.stopPropagation && evt.stopPropagation();
-			evt.stopImmediatePropagation && evt.stopImmediatePropagation();
-			ignoreNextClick = false;
-			return false;
-		}
-	}, true);
-
-
-	// Fixed #973:
-	eventer.on(document, 'touchmove', function(evt) {
-		if ((Sortable.active || awaitingDragStarted) && evt.cancelable) {
-			evt.preventDefault();
-		}
-	});
-	*/
 
 
 	var Sortable =  plugins.Plugin.inherit({

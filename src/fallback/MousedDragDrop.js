@@ -42,7 +42,7 @@ define([
             //dnd.log("_onMouseMove","start");
             var dnd = this.dnd,
             	ghostEl = ghoster.ghostEl,
-            	draggable = dnd.active,
+            	draggable = dnd.dragging,
             	dragEl = dnd.dragEl,
             	tapEvt = dnd.tapEvt;
             if (tapEvt) {
