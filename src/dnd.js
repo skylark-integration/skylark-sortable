@@ -169,12 +169,6 @@ define([
 			}
 		},
 
-		_checkAlignment : function(evt) {
-			if (!dnd.dragEl || !dnd.dragEl.parentNode) return;
-			dnd.active._computeIsAligned(evt);
-		},
-
-
 		_disableDraggable : function (el) {
 			el.draggable = false;
 		},

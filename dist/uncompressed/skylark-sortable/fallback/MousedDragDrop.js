@@ -87,9 +87,6 @@ define([
                 this.touchEvt = touch;
 
                 if (ghostEl) {
-                    //styler.css(ghostEl, 'webkitTransform', translate3d);
-                    //styler.css(ghostEl, 'mozTransform', translate3d);
-                    //styler.css(ghostEl, 'msTransform', translate3d);
                     styler.css(ghostEl, 'transform', translate3d);
 
                 }
@@ -128,7 +125,7 @@ define([
 						if (parent[dnd.expando]) {
 							var inserted;
 
-							inserted = parent[dnd.expando]._onDragOver({
+							inserted = parent[dnd.expando].droppable._onDragOver({
 								clientX: touchEvt.clientX,
 								clientY: touchEvt.clientY,
 								target: target,
@@ -146,7 +143,7 @@ define([
 					/* jshint boss:true */
 					while (parent = parent.parentNode);
 				}
-				dragEl.parentNode[dnd.expando]._computeIsAligned(touchEvt);
+				///dragEl.parentNode[dnd.expando]._computeIsAligned(touchEvt);
 
 				//_unhideGhostForTarget();
 			}
