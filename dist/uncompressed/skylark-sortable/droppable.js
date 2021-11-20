@@ -6,14 +6,46 @@ define([
 	"skylark-domx-noder",
 	"skylark-domx-geom",
 	"skylark-devices-points/touch",
-	"./dnd"
-],function(langx,finder,styler,eventer,noder,geom,touch,dnd){
+	"./dnd",
+	"./fallback/autoscroll"
+],function(langx,finder,styler,eventer,noder,geom,touch,dnd,autoscroll){
 
 	var	moved,
 	    pastFirstInvertThresh,
 	    isCircumstantialInvert,
    		_silent = false;
 
+
+	/**
+	 * Checks if a side of an element is scrolled past a side of it's parents
+	 * @param  {HTMLElement}  el       The element who's side being scrolled out of view is in question
+	 * @param  {String}       side     Side of the element in question ('top', 'left', 'right', 'bottom')
+	 * @return {HTMLElement}           The parent scroll element that the el's side is scrolled past, or null if there is no such element
+	 */
+	function _isScrolledPast(el, side) {
+		var parent = finder.scrollableParent(el, true),
+			elSide = geom.boundingRect(el)[side];
+
+		/* jshint boss:true */
+		while (parent) {
+			var parentSide = geom.boundingRect(parent)[side],
+				visible;
+
+			if (side === 'top' || side === 'left') {
+				visible = elSide >= parentSide;
+			} else {
+				visible = elSide <= parentSide;
+			}
+
+			if (!visible) return parent;
+
+			if (parent === noder.scrollingElement()) break;
+
+			parent = finder.scrollableParent(parent, false);
+		}
+
+		return false;
+	}
 
 
 	function _unsilent() {
@@ -394,7 +426,7 @@ define([
 						aligned = target.sortableMouseAligned,
 						differentLevel = dragEl.parentNode !== el,
 						side1 = axis === 'vertical' ? 'top' : 'left',
-						scrolledPastTop = false, //autoscroll._isScrolledPast(target, 'top') || autoscroll._isScrolledPast(dragEl, 'top'),
+						scrolledPastTop = _isScrolledPast(target, 'top') || _isScrolledPast(dragEl, 'top'),
 						scrollBefore = scrolledPastTop ? scrolledPastTop.scrollTop : void 0;
 
 

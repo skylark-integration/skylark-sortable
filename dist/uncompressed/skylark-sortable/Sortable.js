@@ -299,6 +299,7 @@ define([
 		},
 
         _hideClone: function() {
+        	return;
             if (!dnd.cloneEl.cloneHidden) {
                 styler.hide(dnd.cloneEl);
                 dnd.cloneEl.cloneHidden = true;

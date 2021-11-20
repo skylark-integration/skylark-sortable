@@ -267,12 +267,14 @@ define('skylark-sortable/fallback/autoscroll',[
 	"skylark-langx-hoster/is-browser",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
+	"skylark-domx-finder",
 	"skylark-domx-plugins-scrolls/scrolling-element"
 ],function(
 	langx,
 	isBrowser,
 	geom,
 	styler,
+	finder,
 	scrollingElement
 ){
     'use strict';
@@ -296,36 +298,6 @@ define('skylark-sortable/fallback/autoscroll',[
 		Safari = isBrowser && isBrowser.safari;
 
 
-	/**
-	 * Checks if a side of an element is scrolled past a side of it's parents
-	 * @param  {HTMLElement}  el       The element who's side being scrolled out of view is in question
-	 * @param  {String}       side     Side of the element in question ('top', 'left', 'right', 'bottom')
-	 * @return {HTMLElement}           The parent scroll element that the el's side is scrolled past, or null if there is no such element
-	 */
-	function _isScrolledPast(el, side) {
-		var parent = _getParentAutoScrollElement(el, true),
-			elSide = geom.boundingRect(el)[side];
-
-		/* jshint boss:true */
-		while (parent) {
-			var parentSide = geom.boundingRect(parent)[side],
-				visible;
-
-			if (side === 'top' || side === 'left') {
-				visible = elSide >= parentSide;
-			} else {
-				visible = elSide <= parentSide;
-			}
-
-			if (!visible) return parent;
-
-			if (parent === scrollingElement()) break;
-
-			parent = _getParentAutoScrollElement(parent, false);
-		}
-
-		return false;
-	}
 
 	/**
 	 * Returns the scroll offset of the given element, added with all the scroll offsets of parent elements.
@@ -334,52 +306,12 @@ define('skylark-sortable/fallback/autoscroll',[
 	 * @return {Array}             Offsets in the format of [left, top]
 	 */
 	function _getRelativeScrollOffset(el) {
-		var offsetLeft = 0,
-			offsetTop = 0,
-			winScroller = scrollingElement();
-
-		if (el) {
-			do {
-				var matrix = transforms.matrix(el),
-					scaleX = matrix.a,
-					scaleY = matrix.d;
-
-				offsetLeft += el.scrollLeft * scaleX;
-				offsetTop += el.scrollTop * scaleY;
-			} while (el !== winScroller && (el = el.parentNode));
-		}
-
-		return [offsetLeft, offsetTop];
+		var offsets = geom.scrollOffset(el);
+		return [offsets.offsetLeft, offsets.offsetTop];
 	}
 
-	var _getParentAutoScrollElement = function(el, includeSelf) {
-		// skip to window
-		if (!el || !el.getBoundingClientRect) return scrollingElement();
 
-		var elem = el;
-		var gotSelf = false;
-		do {
-			// we don't need to get elem css if it isn't even overflowing in the first place (performance)
-			if (elem.clientWidth < elem.scrollWidth || elem.clientHeight < elem.scrollHeight) {
-				var elemCSS = styler.css(elem);
-				if (
-					elem.clientWidth < elem.scrollWidth && (elemCSS.overflowX == 'auto' || elemCSS.overflowX == 'scroll') ||
-					elem.clientHeight < elem.scrollHeight && (elemCSS.overflowY == 'auto' || elemCSS.overflowY == 'scroll')
-				) {
-					if (!elem || !elem.getBoundingClientRect || elem === document.body) return scrollingElement();
-
-					if (gotSelf || includeSelf) return elem;
-					gotSelf = true;
-				}
-			}
-		/* jshint boss:true */
-		} while (elem = elem.parentNode);
-
-		return scrollingElement();
-	},
-
-
-	_autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback,expando) {
+	var _autoScroll = _throttle(function (/**Event*/evt, /**Object*/options, /**HTMLElement*/rootEl, /**Boolean*/isFallback,expando) {
 		// Bug: https://bugzilla.mozilla.org/show_bug.cgi?id=505521
 		if (options.scroll) {
 			var _this = rootEl ? rootEl[expando] : window,
@@ -401,7 +333,7 @@ define('skylark-sortable/fallback/autoscroll',[
 				scrollCustomFn = options.scrollFn;
 
 				if (scrollEl === true) {
-					scrollEl = _getParentAutoScrollElement(rootEl, true);
+					scrollEl = finder.scrollableParent(rootEl, true);
 					scrollParentEl = scrollEl;
 				}
 			}
@@ -495,7 +427,7 @@ define('skylark-sortable/fallback/autoscroll',[
 					}
 				}
 				layersOut++;
-			} while (options.bubbleScroll && currentParent !== winScroller && (currentParent = _getParentAutoScrollElement(currentParent, false)));
+			} while (options.bubbleScroll && currentParent !== winScroller && (currentParent = finder.scrollableParent(currentParent, false)));
 			scrolling = scrollThisInstance; // in case another function catches scrolling as false in between when it is not
 		}
 	}, 30),
@@ -513,47 +445,34 @@ define('skylark-sortable/fallback/autoscroll',[
 
 			elem = document.elementFromPoint(x, y);
 
-		// IE does not seem to have native autoscroll,
-		// Edge's autoscroll seems too conditional,
-		// MACOS Safari does not have autoscroll,
-		// Firefox and Chrome are good
-		if (fallback || Edge || IE11OrLess || Safari) {
-			_throttleTimeout = _autoScroll(evt, options, elem, fallback,expando);
 
-			// Listener for pointer element change
-			var ogElemScroller = _getParentAutoScrollElement(elem, true);
-			if (
-				scrolling &&
-				(
-					!pointerElemChangedInterval ||
-					x !== lastPointerElemX ||
-					y !== lastPointerElemY
-				)
-			) {
+		_throttleTimeout = _autoScroll(evt, options, elem, fallback,expando);
 
-				pointerElemChangedInterval && clearInterval(pointerElemChangedInterval);
-				// Detect for pointer elem change, emulating native DnD behaviour
-				pointerElemChangedInterval = setInterval(function() {
-					//if (!dragEl) return;
-					// could also check if scroll direction on newElem changes due to parent autoscrolling
-					var newElem = _getParentAutoScrollElement(document.elementFromPoint(x, y), true);
-					if (newElem !== ogElemScroller) {
-						ogElemScroller = newElem;
-						_clearAutoScrolls();
-						_throttleTimeout = _autoScroll(evt, options, ogElemScroller, fallback);
-					}
-				}, 10);
-				lastPointerElemX = x;
-				lastPointerElemY = y;
-			}
+		// Listener for pointer element change
+		var ogElemScroller = finder.scrollableParent(elem, true);
+		if (
+			scrolling &&
+			(
+				!pointerElemChangedInterval ||
+				x !== lastPointerElemX ||
+				y !== lastPointerElemY
+			)
+		) {
 
-		} else {
-			// if DnD is enabled (and browser has good autoscrolling), first autoscroll will already scroll, so get parent autoscroll of first autoscroll
-			if (!options.bubbleScroll || _getParentAutoScrollElement(elem, true) === scrollingElement()) {
-				_clearAutoScrolls();
-				return;
-			}
-			_throttleTimeout = _autoScroll(evt, options, _getParentAutoScrollElement(elem, false), false);
+			pointerElemChangedInterval && clearInterval(pointerElemChangedInterval);
+			// Detect for pointer elem change, emulating native DnD behaviour
+			pointerElemChangedInterval = setInterval(function() {
+				//if (!dragEl) return;
+				// could also check if scroll direction on newElem changes due to parent autoscrolling
+				var newElem = finder.scrollableParent(document.elementFromPoint(x, y), true);
+				if (newElem !== ogElemScroller) {
+					ogElemScroller = newElem;
+					_clearAutoScrolls();
+					_throttleTimeout = _autoScroll(evt, options, ogElemScroller, fallback);
+				}
+			}, 10);
+			lastPointerElemX = x;
+			lastPointerElemY = y;
 		}
 	};
 
@@ -589,7 +508,6 @@ define('skylark-sortable/fallback/autoscroll',[
 	return {
 		autoScrolls,
 		
-		_isScrolledPast,
 		_getRelativeScrollOffset,
 		_autoScroll,
 
@@ -805,18 +723,6 @@ define('skylark-sortable/fallback/ghoster',[
 				styler.toggleClass(ghostEl, options.fallbackClass, true);
 				styler.toggleClass(ghostEl, options.dragClass, true);
 
-				/*
-				styler.css(ghostEl, 'box-sizing', 'border-box');
-				styler.css(ghostEl, 'margin', 0);
-				styler.css(ghostEl, 'top', rect.top);
-				styler.css(ghostEl, 'left', rect.left);
-				styler.css(ghostEl, 'width', rect.width);
-				styler.css(ghostEl, 'height', rect.height);
-				styler.css(ghostEl, 'opacity', '0.8');
-				styler.css(ghostEl, 'position', (this.PositionGhostAbsolutely ? 'absolute' : 'fixed'));
-				styler.css(ghostEl, 'zIndex', '100000');
-				styler.css(ghostEl, 'pointerEvents', 'none');
-				*/
 
 				styler.css(ghostEl, {
 					'box-sizing': 'border-box',
@@ -875,15 +781,15 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 
 			var $doc = $(document);
 
-			this.listenTo($doc,"mousemove",this._onMouseMove.bind(this));
-			this.listenTo($doc,"mouseup",this._onMouseUp.bind(this));
+			this.listenTo($doc,"mousemove",this._onMouseMove);
+			this.listenTo($doc,"mouseup",this._onMouseUp);
 
 		},
 
 		_onMouseUp : function(evt) {
 			var dnd = this.dnd;
         	if (dnd.putSortable) {
-        		dnd.putSortable._onDrop(evt)
+        		dnd.putSortable.droppable._onDrop(evt)
         	}
         	if (dnd.dragging) {
         		dnd.dragging._onDragEnd(evt);
@@ -903,15 +809,14 @@ define('skylark-sortable/fallback/MousedDragDrop',[
                 var options =  draggable.options,
                     fallbackTolerance = options.fallbackTolerance,
                     fallbackOffset = options.fallbackOffset,
-                    touch = evt.touches ? evt.touches[0] : evt,
                     matrix = ghostEl && transforms.matrix(ghostEl),
                     scaleX = ghostEl && matrix && matrix.a,
                     scaleY = ghostEl && matrix && matrix.d,
                     relativeScrollOffset = ghoster.getRelativeScrollOffset(),
-                    dx = ((touch.clientX - tapEvt.clientX)
+                    dx = ((evt.clientX - tapEvt.clientX)
                             + fallbackOffset.x) / (scaleX || 1)
                             + (relativeScrollOffset ? (relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0]) : 0) / (scaleX || 1),
-                    dy = ((touch.clientY - tapEvt.clientY)
+                    dy = ((evt.clientY - tapEvt.clientY)
                             + fallbackOffset.y) / (scaleY || 1)
                             + (relativeScrollOffset ? (relativeScrollOffset[1] - ghostRelativeParentInitialScroll[1]) : 0) / (scaleY || 1),
                     translate3d = evt.touches ? 'translate3d(' + dx + 'px,' + dy + 'px,0)' : 'translate(' + dx + 'px,' + dy + 'px)';
@@ -919,7 +824,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
                 // only set the status to dragging, when we are actually dragging
                 if (!this._dragStarted && !dnd.awaitingDragStarted) {
                     if (fallbackTolerance &&
-                        Math.min( Math.abs(touch.clientX - draggable._lastX),  Math.abs(touch.clientY - draggable._lastY)) < fallbackTolerance
+                        Math.min( Math.abs(evt.clientX - draggable._lastX),  Math.abs(evt.clientY - draggable._lastY)) < fallbackTolerance
                     ) {
                         return;
                     }
@@ -934,11 +839,11 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 
                 }
 
-                !forAutoScroll && this._handleAutoScroll(touch, true);
+                !forAutoScroll && this._handleAutoScroll(evt, true);
 
                 ///moved = true;
                 ///dnd.touchEvt = touch;
-                this.touchEvt = touch;
+                this.touchEvt = evt;
 
                 if (ghostEl) {
                     styler.css(ghostEl, 'transform', translate3d);
@@ -1292,14 +1197,13 @@ define('skylark-sortable/draggable',[
         }
     }
 
-
 	class Draggable {
 		constructor(sortable,options) {
 			this.sortable = sortable;
 			var el = this._elm = sortable.elm();
 			this.options = options;
 
-	            // Bind events
+	        // Bind events
             touch.mousy(el);
             eventer.on(el, 'mousedown', this._onMouseDown.bind(this));
 
@@ -1540,6 +1444,7 @@ define('skylark-sortable/draggable',[
             var el = this._elm,
                 options = this.options,
                 dragEl = dnd.dragEl,
+                sortable = this.sortable,
                 putSortable = dnd.putSortable;
 
             dnd.awaitingDragStarted = false;
@@ -1576,7 +1481,7 @@ define('skylark-sortable/draggable',[
 
 
 
-            if (this.nativeDraggable) {
+            if (sortable.nativeDraggable) {
                 eventer.off(dnd.dragEl, 'dragstart', this._onDragStart);
                 eventer.off(dnd.dragEl, 'dragend', this._onDragEnd);
             }
@@ -1609,14 +1514,46 @@ define('skylark-sortable/droppable',[
 	"skylark-domx-noder",
 	"skylark-domx-geom",
 	"skylark-devices-points/touch",
-	"./dnd"
-],function(langx,finder,styler,eventer,noder,geom,touch,dnd){
+	"./dnd",
+	"./fallback/autoscroll"
+],function(langx,finder,styler,eventer,noder,geom,touch,dnd,autoscroll){
 
 	var	moved,
 	    pastFirstInvertThresh,
 	    isCircumstantialInvert,
    		_silent = false;
 
+
+	/**
+	 * Checks if a side of an element is scrolled past a side of it's parents
+	 * @param  {HTMLElement}  el       The element who's side being scrolled out of view is in question
+	 * @param  {String}       side     Side of the element in question ('top', 'left', 'right', 'bottom')
+	 * @return {HTMLElement}           The parent scroll element that the el's side is scrolled past, or null if there is no such element
+	 */
+	function _isScrolledPast(el, side) {
+		var parent = finder.scrollableParent(el, true),
+			elSide = geom.boundingRect(el)[side];
+
+		/* jshint boss:true */
+		while (parent) {
+			var parentSide = geom.boundingRect(parent)[side],
+				visible;
+
+			if (side === 'top' || side === 'left') {
+				visible = elSide >= parentSide;
+			} else {
+				visible = elSide <= parentSide;
+			}
+
+			if (!visible) return parent;
+
+			if (parent === noder.scrollingElement()) break;
+
+			parent = finder.scrollableParent(parent, false);
+		}
+
+		return false;
+	}
 
 
 	function _unsilent() {
@@ -1997,7 +1934,7 @@ define('skylark-sortable/droppable',[
 						aligned = target.sortableMouseAligned,
 						differentLevel = dragEl.parentNode !== el,
 						side1 = axis === 'vertical' ? 'top' : 'left',
-						scrolledPastTop = false, //autoscroll._isScrolledPast(target, 'top') || autoscroll._isScrolledPast(dragEl, 'top'),
+						scrolledPastTop = _isScrolledPast(target, 'top') || _isScrolledPast(dragEl, 'top'),
 						scrollBefore = scrolledPastTop ? scrolledPastTop.scrollTop : void 0;
 
 
@@ -2531,6 +2468,7 @@ define('skylark-sortable/Sortable',[
 		},
 
         _hideClone: function() {
+        	return;
             if (!dnd.cloneEl.cloneHidden) {
                 styler.hide(dnd.cloneEl);
                 dnd.cloneEl.cloneHidden = true;

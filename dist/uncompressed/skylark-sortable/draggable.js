@@ -58,14 +58,13 @@ define([
         }
     }
 
-
 	class Draggable {
 		constructor(sortable,options) {
 			this.sortable = sortable;
 			var el = this._elm = sortable.elm();
 			this.options = options;
 
-	            // Bind events
+	        // Bind events
             touch.mousy(el);
             eventer.on(el, 'mousedown', this._onMouseDown.bind(this));
 
@@ -306,6 +305,7 @@ define([
             var el = this._elm,
                 options = this.options,
                 dragEl = dnd.dragEl,
+                sortable = this.sortable,
                 putSortable = dnd.putSortable;
 
             dnd.awaitingDragStarted = false;
@@ -342,7 +342,7 @@ define([
 
 
 
-            if (this.nativeDraggable) {
+            if (sortable.nativeDraggable) {
                 eventer.off(dnd.dragEl, 'dragstart', this._onDragStart);
                 eventer.off(dnd.dragEl, 'dragend', this._onDragEnd);
             }

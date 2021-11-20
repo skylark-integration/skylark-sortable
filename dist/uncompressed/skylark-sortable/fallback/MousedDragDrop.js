@@ -21,15 +21,15 @@ define([
 
 			var $doc = $(document);
 
-			this.listenTo($doc,"mousemove",this._onMouseMove.bind(this));
-			this.listenTo($doc,"mouseup",this._onMouseUp.bind(this));
+			this.listenTo($doc,"mousemove",this._onMouseMove);
+			this.listenTo($doc,"mouseup",this._onMouseUp);
 
 		},
 
 		_onMouseUp : function(evt) {
 			var dnd = this.dnd;
         	if (dnd.putSortable) {
-        		dnd.putSortable._onDrop(evt)
+        		dnd.putSortable.droppable._onDrop(evt)
         	}
         	if (dnd.dragging) {
         		dnd.dragging._onDragEnd(evt);
@@ -49,15 +49,14 @@ define([
                 var options =  draggable.options,
                     fallbackTolerance = options.fallbackTolerance,
                     fallbackOffset = options.fallbackOffset,
-                    touch = evt.touches ? evt.touches[0] : evt,
                     matrix = ghostEl && transforms.matrix(ghostEl),
                     scaleX = ghostEl && matrix && matrix.a,
                     scaleY = ghostEl && matrix && matrix.d,
                     relativeScrollOffset = ghoster.getRelativeScrollOffset(),
-                    dx = ((touch.clientX - tapEvt.clientX)
+                    dx = ((evt.clientX - tapEvt.clientX)
                             + fallbackOffset.x) / (scaleX || 1)
                             + (relativeScrollOffset ? (relativeScrollOffset[0] - ghostRelativeParentInitialScroll[0]) : 0) / (scaleX || 1),
-                    dy = ((touch.clientY - tapEvt.clientY)
+                    dy = ((evt.clientY - tapEvt.clientY)
                             + fallbackOffset.y) / (scaleY || 1)
                             + (relativeScrollOffset ? (relativeScrollOffset[1] - ghostRelativeParentInitialScroll[1]) : 0) / (scaleY || 1),
                     translate3d = evt.touches ? 'translate3d(' + dx + 'px,' + dy + 'px,0)' : 'translate(' + dx + 'px,' + dy + 'px)';
@@ -65,7 +64,7 @@ define([
                 // only set the status to dragging, when we are actually dragging
                 if (!this._dragStarted && !dnd.awaitingDragStarted) {
                     if (fallbackTolerance &&
-                        Math.min( Math.abs(touch.clientX - draggable._lastX),  Math.abs(touch.clientY - draggable._lastY)) < fallbackTolerance
+                        Math.min( Math.abs(evt.clientX - draggable._lastX),  Math.abs(evt.clientY - draggable._lastY)) < fallbackTolerance
                     ) {
                         return;
                     }
@@ -80,11 +79,11 @@ define([
 
                 }
 
-                !forAutoScroll && this._handleAutoScroll(touch, true);
+                !forAutoScroll && this._handleAutoScroll(evt, true);
 
                 ///moved = true;
                 ///dnd.touchEvt = touch;
-                this.touchEvt = touch;
+                this.touchEvt = evt;
 
                 if (ghostEl) {
                     styler.css(ghostEl, 'transform', translate3d);

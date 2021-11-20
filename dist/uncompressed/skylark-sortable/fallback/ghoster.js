@@ -140,18 +140,6 @@ define([
 				styler.toggleClass(ghostEl, options.fallbackClass, true);
 				styler.toggleClass(ghostEl, options.dragClass, true);
 
-				/*
-				styler.css(ghostEl, 'box-sizing', 'border-box');
-				styler.css(ghostEl, 'margin', 0);
-				styler.css(ghostEl, 'top', rect.top);
-				styler.css(ghostEl, 'left', rect.left);
-				styler.css(ghostEl, 'width', rect.width);
-				styler.css(ghostEl, 'height', rect.height);
-				styler.css(ghostEl, 'opacity', '0.8');
-				styler.css(ghostEl, 'position', (this.PositionGhostAbsolutely ? 'absolute' : 'fixed'));
-				styler.css(ghostEl, 'zIndex', '100000');
-				styler.css(ghostEl, 'pointerEvents', 'none');
-				*/
 
 				styler.css(ghostEl, {
 					'box-sizing': 'border-box',
