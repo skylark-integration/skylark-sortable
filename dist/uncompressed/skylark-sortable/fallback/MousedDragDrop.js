@@ -15,6 +15,7 @@ define([
 	ghoster,
 	autoscroll
 ){
+
 	var MousedDragDrop = langx.Emitter.inherit({
 		_construct : function(dnd) {
 			this.dnd = dnd;
@@ -38,7 +39,7 @@ define([
         	this.destroy();
 		},
 
-        _onMouseMove: function (/**TouchEvent*/evt, forAutoScroll) {
+        _onMouseMove: function (/**TouchEvent*/evt) {
             //dnd.log("_onMouseMove","start");
             var dnd = this.dnd,
             	ghostEl = ghoster.ghostEl,
@@ -79,7 +80,7 @@ define([
 
                 }
 
-                !forAutoScroll && this._handleAutoScroll(evt, true);
+                this._handleAutoScroll(evt, true);
 
                 ///moved = true;
                 ///dnd.touchEvt = touch;
@@ -155,7 +156,9 @@ define([
 			if (!dnd.dragEl || !dnd.active.options.scroll) return;
 
 			return autoscroll._handleAutoScroll(evt,dnd.active.options,fallback,dnd.expando);
-		},
+
+
+    	},
 
 		destroy : function() {
 			this.unlistenTo();

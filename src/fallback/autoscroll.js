@@ -153,7 +153,7 @@ define([
 							var scrollOffsetX = autoScrolls[this.layer].vx ? autoScrolls[this.layer].vx * speed : 0;
 
 							if ('function' === typeof(scrollCustomFn)) {
-								if (scrollCustomFn.call(_this, scrollOffsetX, scrollOffsetY, evt, touchEvt, autoScrolls[this.layer].el) !== 'continue') {
+								if (scrollCustomFn.call(_this, scrollOffsetX, scrollOffsetY, evt, evt, autoScrolls[this.layer].el) !== 'continue') {
 									return;
 								}
 							}
@@ -182,12 +182,13 @@ define([
 			elem = document.elementFromPoint(x, y);
 
 
-		_throttleTimeout = _autoScroll(evt, options, elem, fallback,expando);
+		///_throttleTimeout = _autoScroll(evt, options, elem, fallback,expando);
 
 		// Listener for pointer element change
-		var ogElemScroller = finder.scrollableParent(elem, true);
+		////var ogElemScroller = finder.scrollableParent(elem, true);
+		var ogElemScroller ;
 		if (
-			scrolling &&
+		///	scrolling &&
 			(
 				!pointerElemChangedInterval ||
 				x !== lastPointerElemX ||
@@ -237,8 +238,6 @@ define([
 		this.scrollEl =
 		this.scrollParentEl =
 		this.autoScrolls.length = null;
-
-
 
 	}
 	return {

@@ -417,7 +417,7 @@ define('skylark-sortable/fallback/autoscroll',[
 							var scrollOffsetX = autoScrolls[this.layer].vx ? autoScrolls[this.layer].vx * speed : 0;
 
 							if ('function' === typeof(scrollCustomFn)) {
-								if (scrollCustomFn.call(_this, scrollOffsetX, scrollOffsetY, evt, touchEvt, autoScrolls[this.layer].el) !== 'continue') {
+								if (scrollCustomFn.call(_this, scrollOffsetX, scrollOffsetY, evt, evt, autoScrolls[this.layer].el) !== 'continue') {
 									return;
 								}
 							}
@@ -446,12 +446,13 @@ define('skylark-sortable/fallback/autoscroll',[
 			elem = document.elementFromPoint(x, y);
 
 
-		_throttleTimeout = _autoScroll(evt, options, elem, fallback,expando);
+		///_throttleTimeout = _autoScroll(evt, options, elem, fallback,expando);
 
 		// Listener for pointer element change
-		var ogElemScroller = finder.scrollableParent(elem, true);
+		////var ogElemScroller = finder.scrollableParent(elem, true);
+		var ogElemScroller ;
 		if (
-			scrolling &&
+		///	scrolling &&
 			(
 				!pointerElemChangedInterval ||
 				x !== lastPointerElemX ||
@@ -501,8 +502,6 @@ define('skylark-sortable/fallback/autoscroll',[
 		this.scrollEl =
 		this.scrollParentEl =
 		this.autoScrolls.length = null;
-
-
 
 	}
 	return {
@@ -775,6 +774,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 	ghoster,
 	autoscroll
 ){
+
 	var MousedDragDrop = langx.Emitter.inherit({
 		_construct : function(dnd) {
 			this.dnd = dnd;
@@ -798,7 +798,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
         	this.destroy();
 		},
 
-        _onMouseMove: function (/**TouchEvent*/evt, forAutoScroll) {
+        _onMouseMove: function (/**TouchEvent*/evt) {
             //dnd.log("_onMouseMove","start");
             var dnd = this.dnd,
             	ghostEl = ghoster.ghostEl,
@@ -839,7 +839,7 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 
                 }
 
-                !forAutoScroll && this._handleAutoScroll(evt, true);
+                this._handleAutoScroll(evt, true);
 
                 ///moved = true;
                 ///dnd.touchEvt = touch;
@@ -915,7 +915,9 @@ define('skylark-sortable/fallback/MousedDragDrop',[
 			if (!dnd.dragEl || !dnd.active.options.scroll) return;
 
 			return autoscroll._handleAutoScroll(evt,dnd.active.options,fallback,dnd.expando);
-		},
+
+
+    	},
 
 		destroy : function() {
 			this.unlistenTo();
