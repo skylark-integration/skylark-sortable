@@ -326,17 +326,17 @@ define('skylark-sortable/fallback/autoscroll',[
 				scrollThisInstance = false;
 
 			// Detect scrollEl
-			if (scrollParentEl !== rootEl) {
-				_clearAutoScrolls();
+			///if (scrollParentEl !== rootEl) {
+			///	_clearAutoScrolls();
 
-				scrollEl = options.scroll;
-				scrollCustomFn = options.scrollFn;
+			///	scrollEl = options.scroll;
+			///	scrollCustomFn = options.scrollFn;
 
-				if (scrollEl === true) {
+			///	if (scrollEl === true) {
 					scrollEl = finder.scrollableParent(rootEl, true);
-					scrollParentEl = scrollEl;
-				}
-			}
+			///		scrollParentEl = scrollEl;
+			///	}
+			///}
 
 
 			var layersOut = 0;
@@ -428,7 +428,7 @@ define('skylark-sortable/fallback/autoscroll',[
 				}
 				layersOut++;
 			} while (options.bubbleScroll && currentParent !== winScroller && (currentParent = finder.scrollableParent(currentParent, false)));
-			scrolling = scrollThisInstance; // in case another function catches scrolling as false in between when it is not
+			///scrolling = scrollThisInstance; // in case another function catches scrolling as false in between when it is not
 		}
 	}, 30),
 
