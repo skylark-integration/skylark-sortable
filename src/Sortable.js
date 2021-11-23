@@ -469,13 +469,7 @@ define([
 
 			el[dnd.expando] = null;
 
-			eventer.off(el, 'mousedown', this._onTapStart);
 
-
-			if (this.nativeDraggable) {
-				eventer.off(el, 'dragover', this);
-				eventer.off(el, 'dragenter', this);
-			}
 			// Remove draggable attributes
 			Array.prototype.forEach.call(el.querySelectorAll('[draggable]'), function (el) {
 				el.removeAttribute('draggable');

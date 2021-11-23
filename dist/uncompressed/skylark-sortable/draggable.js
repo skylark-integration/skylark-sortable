@@ -66,7 +66,7 @@ define([
 
 	        // Bind events
             touch.mousy(el);
-            eventer.on(el, 'mousedown', this._onMouseDown.bind(this));
+            eventer.on(el, 'mousedown', this._onMouseDown,this);
 
 		}
 
@@ -359,6 +359,11 @@ define([
            	//this.dragEl = null;
 
             dnd.end();
+
+        }
+
+        destroy() {
+                    eventer.off(el, 'mousedown', this._onMouseDown);
 
         }
 	}

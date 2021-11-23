@@ -653,6 +653,16 @@ define([
 			}
 		}
 
+		destroy() {
+			var sortable = this.sortable;
+
+			if (sortable.nativeDraggable) {
+				eventer.off(el, 'dragover', this);
+				eventer.off(el, 'dragenter', this);
+			}
+
+		}
+
 
 	}
 
