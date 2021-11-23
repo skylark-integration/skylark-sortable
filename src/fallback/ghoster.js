@@ -11,7 +11,6 @@ define([
 	"skylark-domx-styler",
 	"skylark-domx-eventer",
 	"skylark-domx-transforms",
-	"skylark-domx-plugins-scrolls/scrolling-element",
 	"skylark-domx-layouts/oriented",
 	"skylark-devices-points/touch"
 ],function(
@@ -27,7 +26,6 @@ define([
 	styler,
 	eventer,
 	transforms,
-	scrollingElement,
 	oriented,
 	touch
 ){
@@ -122,15 +120,16 @@ define([
 
 					if (ghostRelativeParent !== document.body && ghostRelativeParent !== document.documentElement) {
 						if (ghostRelativeParent === document) {
-							ghostRelativeParent = this.ghostRelativeParent = scrollingElement();
+							ghostRelativeParent = this.ghostRelativeParent = noder.scrollingElement();
 						}							
 
 						rect.top += ghostRelativeParent.scrollTop;
 						rect.left += ghostRelativeParent.scrollLeft;
 					} else {
-						ghostRelativeParent = this.ghostRelativeParent = scrollingElement();
+						ghostRelativeParent = this.ghostRelativeParent = noder.scrollingElement();
 					}
-					ghostRelativeParentInitialScroll = autoscroll._getRelativeScrollOffset(ghostRelativeParent);
+					var offsets = geom.scrollOffset(ghostRelativeParent);
+					ghostRelativeParentInitialScroll = [offsets.offsetLeft,offsets.offsetTop]
 				}
 
 

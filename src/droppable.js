@@ -6,9 +6,8 @@ define([
 	"skylark-domx-noder",
 	"skylark-domx-geom",
 	"skylark-devices-points/touch",
-	"./dnd",
-	"./fallback/autoscroll"
-],function(langx,finder,styler,eventer,noder,geom,touch,dnd,autoscroll){
+	"./dnd"
+],function(langx,finder,styler,eventer,noder,geom,touch,dnd){
 
 	var	moved,
 	    pastFirstInvertThresh,

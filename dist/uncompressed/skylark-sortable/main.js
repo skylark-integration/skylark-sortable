@@ -4,7 +4,6 @@ define([
 	"skylark-domx-finder",
 	"skylark-domx-noder",
 	"skylark-domx-styler",
-	"./fallback/autoscroll",
 	"./Sortable"
 ],function(
 	langx,
@@ -12,7 +11,6 @@ define([
 	finder,
 	noder,
 	styler,
-	autoscroll,
 	Sortable
 ){
 	// Export utils
@@ -25,7 +23,7 @@ define([
 			return !!finder.closest(el, selector, el, false);
 		},
 		extend: langx.mixin,
-		throttle: autoscroll._throttle,
+		throttle: langx.debounce,
 		closest: finder.closest,
 		toggleClass: styler.toggleClass,
 		clone: 	function (el) {
