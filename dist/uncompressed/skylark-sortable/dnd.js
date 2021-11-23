@@ -124,6 +124,11 @@ define([
 
 			//}
 
+            if (dnd.active.nativeDraggable) {
+                eventer.off(dnd.dragEl, 'dragstart');
+                eventer.off(dnd.dragEl, 'dragend');
+            }
+
         	this._nulling();
  		},
 

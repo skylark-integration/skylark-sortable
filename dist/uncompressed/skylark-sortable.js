@@ -855,6 +855,11 @@ define('skylark-sortable/dnd',[
 
 			//}
 
+            if (dnd.active.nativeDraggable) {
+                eventer.off(dnd.dragEl, 'dragstart');
+                eventer.off(dnd.dragEl, 'dragend');
+            }
+
         	this._nulling();
  		},
 
@@ -995,11 +1000,11 @@ define('skylark-sortable/draggable',[
 
 	class Draggable {
 		constructor(sortable,options) {
-			this.sortable = sortable;
-			var el = this._elm = sortable.elm();
-			this.options = options;
+            this.sortable = sortable;
+            var el = this._elm = sortable.elm();
+            this.options = options;
 
-	        // Bind events
+            // Bind events
             touch.mousy(el);
             eventer.on(el, 'mousedown', this._onMouseDown,this);
 
@@ -1276,12 +1281,6 @@ define('skylark-sortable/draggable',[
            /// }
 
 
-
-            if (sortable.nativeDraggable) {
-                eventer.off(dnd.dragEl, 'dragstart', this._onDragStart);
-                eventer.off(dnd.dragEl, 'dragend', this._onDragEnd);
-            }
-
             lastDownEl = null;
 
             savedInputChecked.forEach(function (el) {
@@ -1298,7 +1297,7 @@ define('skylark-sortable/draggable',[
         }
 
         destroy() {
-                    eventer.off(el, 'mousedown', this._onMouseDown);
+            eventer.off(el, 'mousedown', this._onMouseDown);
 
         }
 	}
