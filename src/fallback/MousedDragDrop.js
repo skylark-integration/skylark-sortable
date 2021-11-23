@@ -3,18 +3,22 @@ define([
 	"skylark-domx-query",
 	"skylark-domx-eventer",
 	"skylark-domx-styler",
+	"skylark-domx-finder",
 	"skylark-domx-transforms",
-	"./ghoster",
-	"./autoscroll"
+	"skylark-domx-plugins-scrolls/auto-scroll",
+	"./ghoster"
 ],function(
 	langx,
 	$,
 	eventer,
 	styler,
+	finder,
 	transforms,
-	ghoster,
-	autoscroll
+	AutoScroll,
+	ghoster
 ){
+  'use strict';
+
 
 	var MousedDragDrop = langx.Emitter.inherit({
 		_construct : function(dnd) {
@@ -155,9 +159,46 @@ define([
 
 			if (!dnd.dragEl || !dnd.active.options.scroll) return;
 
-			return autoscroll._handleAutoScroll(evt,dnd.active.options,fallback,dnd.expando);
+			///return autoscroll._handleAutoScroll(evt,dnd.active.options,fallback,dnd.expando);
 
 
+			var x = evt.clientX,
+				y = evt.clientY,
+
+				elem = document.elementFromPoint(x, y);
+
+
+			// Listener for pointer element change
+			////var ogElemScroller = finder.scrollableParent(elem, true);
+			if (
+				(
+					!this.pointerElemChangedInterval ||
+					x !== this.lastPointerElemX ||
+					y !== this.lastPointerElemY
+				)
+			) {
+
+				if (this.pointerElemChangedInterval){
+					clearInterval(this.pointerElemChangedInterval);	
+				} 
+				// Detect for pointer elem change, emulating native DnD behaviour
+  			    var ogElemScroller = null ;
+				this.pointerElemChangedInterval = setInterval(function() {
+					// could also check if scroll direction on newElem changes due to parent autoscrolling
+					var newElem = finder.scrollableParent(document.elementFromPoint(x, y), true);
+					if (newElem !== ogElemScroller) {
+						ogElemScroller = newElem;
+						if (this.autoscroller) {
+							this.autoscroller.destroy();
+							this.autoscroller = null;
+						}
+						this.autoscroller = new AutoScroll(ogElemScroller,dnd.active.options);
+						this.autoscroller.handle(x,y);
+					}
+				}, 10);
+				this.lastPointerElemX = x;
+				this.lastPointerElemY = y;
+			}
     	},
 
 		destroy : function() {
@@ -166,10 +207,20 @@ define([
         		clearInterval(this._loopId);
         	}
 
-            autoscroll._nulling();
+			if (this.pointerElemChangedInterval){
+				clearInterval(this.pointerElemChangedInterval);	
+			} 
+
+            ///autoscroll._nulling();
             
-            autoscroll._clearAutoScrolls();
-            autoscroll._cancelThrottle();
+            //autoscroll._clearAutoScrolls();
+            ///autoscroll._cancelThrottle();
+
+            if (this.autoscroller) {
+            	this.autoscroller.destroy();
+            	this.autoscroller = null;            	
+            }
+
             this._dragStarted = false;
 		}
 	});
