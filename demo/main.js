@@ -171,6 +171,11 @@ requirejs.config({
             main: 'main'
          },
          {
+           name : "skylark-domx-plugins-dnd",
+           location : "../node_modules/skylark-domx-plugins-dnd/dist/uncompressed/skylark-domx-plugins-dnd",
+            main: 'main'
+         },         
+         {
            name : "skylark-domx-plugins-popups",
            location : "../node_modules/skylark-domx-plugins-popups/dist/uncompressed/skylark-domx-plugins-popups",
             main: 'main'

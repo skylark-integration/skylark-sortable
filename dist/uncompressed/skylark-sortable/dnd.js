@@ -7,8 +7,7 @@ define([
 	"skylark-domx-finder",
 	"skylark-domx-geom",
 	"skylark-domx-styler",
-	"skylark-domx-eventer",
-	"./fallback/MousedDragDrop"
+	"skylark-domx-eventer"
 ],function(
 	skylark,
 	langx,
@@ -18,8 +17,7 @@ define([
 	finder,
 	geom,
 	styler,
-	eventer,
-	MousedDragDrop
+	eventer
 ){
     'use strict';
 
@@ -58,32 +56,7 @@ define([
         	this.active = draggable.sortable;
 
         	this.dragEl = dragEl;
-            if (!this.active.nativeDraggable) {
-            	this._fallbacker = new MousedDragDrop(this);
-            } else {
-            	dragEl.draggable = true;
-                eventer.on(dnd.dragEl, 'dragend', (e)=>{
-                	this.dragging._onDragEnd(e)
-                });
-                eventer.on(dnd.dragEl, 'dragstart', (e)=>{
-                	this.dragging._onDragStart(e)
-                });
-            }
-
-            dnd.log("_triggerDragStart","start");
-            dnd.log("_triggerDragStart","nativeDraggable is " +  this.active.nativeDraggable);
-
-            try {
-                if (document.selection) {
-                    // Timeout neccessary for IE9
-                    langx.defer(function () {
-                        document.selection.empty();
-                    });
-                } else {
-                    window.getSelection().removeAllRanges();
-                }
-            } catch (err) {
-            }
+ 
 
 		},
 
@@ -91,20 +64,6 @@ define([
         	this.dragging = draggable;
         	this.active = draggable.sortable;
 
-			//var el = this.active.elm(),
-			//	ownerDocument = el.ownerDocument;
-
-
-			//eventer.on(ownerDocument, 'dragover', this.nearestEmptyInsertDetectEvent);
-			///eventer.on(ownerDocument, 'mousemove', this.nearestEmptyInsertDetectEvent);
-			///eventer.on(ownerDocument, 'touchmove', nearestEmptyInsertDetectEvent);
-
-			///if (this.active.nativeDraggable) {
-                ///eventer.on(document, 'dragover', this._handleAutoScroll);
-               // eventer.on(document, 'dragover', this._checkAlignment);
-            //} else {
-                ///eventer.on(document, 'mousemove', this._handleAutoScroll);
-            //}
         },
 
         over : function(evt) {
@@ -112,22 +71,7 @@ define([
         },
 
         end: function(dropped) {
-	  		//eventer.off(document, 'dragover', this.nearestEmptyInsertDetectEvent);
-	  		///eventer.off(document, 'mousemove', this.nearestEmptyInsertDetectEvent);
-	
-			//if (this.active.nativeDraggable) {
-				///eventer.off(document, 'dragover', this._handleAutoScroll);
-				//eventer.off(document, 'dragover', this._checkAlignment);
-			//} else {
-		        // Unbind events
-	            ///eventer.off(document, 'mousemove', this._onTouchMove);
 
-			//}
-
-            if (dnd.active.nativeDraggable) {
-                eventer.off(dnd.dragEl, 'dragstart');
-                eventer.off(dnd.dragEl, 'dragend');
-            }
 
         	this._nulling();
  		},

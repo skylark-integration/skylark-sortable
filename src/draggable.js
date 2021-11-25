@@ -4,9 +4,9 @@ define([
 	"skylark-domx-styler",
 	"skylark-domx-eventer",
 	"skylark-domx-noder",
-	"skylark-devices-points/touch",
+    "skylark-domx-plugins-dnd/draggable",
 	"./dnd"
-],function(langx,finder,styler,eventer,noder,touch,dnd){
+],function(langx,finder,styler,eventer,noder,DndDraggable,dnd){
     var 
         lastDownEl,
         scrolling,
@@ -64,51 +64,45 @@ define([
             var el = this._elm = sortable.elm();
             this.options = options;
 
-            // Bind events
-            touch.mousy(el);
-            eventer.on(el, 'mousedown', this._onMouseDown,this);
+            var self = this;
 
+            this._dndDraggable = new DndDraggable(el,{
+                forceFallback : this.options.forceFallback,
+                source : this.options.draggable,
+                handle : this.options.handle,
+                preparing : function(e) {
+                    self._onPrepare(e);
+                },
+
+                started: function(e) {
+                    self._onDragStart(e.originalEvent);
+                },
+
+                ended : function(e) {
+                    self._onDragEnd(e.originalEvent);
+                }
+            });
 		}
 
 		elm() {
 			return this._elm;
 		}
-		//drag start 
         // handle moudedown event
-        _onMouseDown(/** Event|TouchEvent */evt) {
-            //if (!evt.cancelable) return;
+        _onPrepare(evt) {
             var sortable = this.sortable,
                 el = this._elm,
                 options = this.options,
                 preventOnFilter = options.preventOnFilter,
-                type = evt.type,
-                target = evt.target,
-                originalTarget = evt.target.shadowRoot && ((evt.path && evt.path[0]) || (evt.composedPath && evt.composedPath()[0])) || target,
+                target = evt.dragSource,
                 filter = options.filter,
                 startIndex,
                 startDraggableIndex;
 
             _saveInputCheckedState(el);
 
-            // Don't trigger start event when an element is been dragged, otherwise the evt.oldindex always wrong when set option.group.
-            ///if (dnd.dragEl) {
-            ///    return;
-            ///}
-
-            if (/mousedown/.test(type) && evt.button !== 0 || options.disabled) {
-                return; // only left button and enabled
-            }
-
-            // cancel dnd if original target is content editable
-            if (originalTarget.isContentEditable) {
-                return;
-            }
-
-            target = finder.closest(target, options.draggable, el, false);
-
 
             if (lastDownEl === target) {
-                // Ignoring duplicate `down`
+                evt.dragSource = null;
                 return;
             }
 
@@ -122,7 +116,10 @@ define([
             if (typeof filter === 'function') {
                 if (filter.call(this, evt, target, this)) {
                     sortable._dispatchEvent(sortable, originalTarget, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
-                    preventOnFilter && evt.cancelable && evt.preventDefault();
+                    if (preventOnFilter) {
+                        evt.preventDefault = true;
+                    }
+                    evt.dragSource = null;
                     return; // cancel dnd
                 }
             }
@@ -132,19 +129,23 @@ define([
 
                     if (criteria) {
                         sortable._dispatchEvent(sortable, criteria, 'filter', target, el, el, startIndex, undefined, startDraggableIndex);
-                        return true;
+                        evt.dragSource = null;
+                        return; // cancel dnd
                     }
                 });
 
                 if (filter) {
-                    preventOnFilter && evt.cancelable && evt.preventDefault();
+                    if (preventOnFilter) {
+                        evt.preventDefault = true;
+                    }
+                    evt.dragSource = null;
                     return; // cancel dnd
                 }
             }
 
-            if (options.handle && !finder.closest(originalTarget, options.handle, el, false)) {
-                return;
-            }
+            ///if (options.handle && !finder.closest(originalTarget, options.handle, el, false)) {
+            ///    return;
+            ///}
 
             // Prepare `dragstart`
             var
@@ -170,12 +171,12 @@ define([
 
                 tapEvt = dnd.tapEvt = {
                     target: dragEl,
-                    clientX: evt.clientX,
-                    clientY: evt.clientY
+                    clientX: evt.originalEvent.clientX,
+                    clientY: evt.originalEvent.clientY
                 };
 
-                this._lastX = evt.clientX;
-                this._lastY = evt.clientY;
+                this._lastX = evt.originalEvent.clientX;
+                this._lastY = evt.originalEvent.clientY;
 
                 dragEl.style['will-change'] = 'all';
                 // undo animation if needed
@@ -354,12 +355,9 @@ define([
 
             dnd.end();
 
-        }
-
-        destroy() {
-            eventer.off(el, 'mousedown', this._onMouseDown);
 
         }
+
 	}
 
 

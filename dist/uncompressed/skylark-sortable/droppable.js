@@ -5,9 +5,9 @@ define([
 	"skylark-domx-eventer",
 	"skylark-domx-noder",
 	"skylark-domx-geom",
-	"skylark-devices-points/touch",
+    "skylark-domx-plugins-dnd/droppable",
 	"./dnd"
-],function(langx,finder,styler,eventer,noder,geom,touch,dnd){
+],function(langx,finder,styler,eventer,noder,geom,DndDroppable,dnd){
 
 	var	moved,
 	    pastFirstInvertThresh,
@@ -140,11 +140,36 @@ define([
 			var el = this.el= this._elm = sortable.elm();
 			this.options = options;
 
-			if (sortable.nativeDraggable) {
-				eventer.on(el, 'dragover', this);
-				eventer.on(el, 'dragenter', this);
+
+			var self = this;
+
+            this._dndDroppable = new DndDroppable(el,{
+	            started: function(e) {
+	                e.acceptable = true;
+	                e.activeClass = "active";
+	                e.hoverClass = "over";
+	            },
+
+                overing : function(e) {
+					if (dnd.dragEl) {
+						self._onDragOver(e.originalEvent);
+						_globalDragOver(e.originalEvent);
+					}
+                },
+
+
+                dropped : function(e) {
+                    self._onDrop(e.originalEvent);
+                }
+            });
+
+
+
+			///if (sortable.nativeDraggable) {
+			///	eventer.on(el, 'dragover', this);
+			///	eventer.on(el, 'dragenter', this);
 		        eventer.on(el, 'drop', this);
-			}
+			///}
 	        eventer.on(el, 'selectstart', this);
 		}
 
@@ -656,11 +681,11 @@ define([
 		destroy() {
 			var sortable = this.sortable;
 
-			if (sortable.nativeDraggable) {
-				eventer.off(el, 'dragover', this);
-				eventer.off(el, 'dragenter', this);
-			}
-
+			///if (sortable.nativeDraggable) {
+			///	eventer.off(el, 'dragover', this);
+		   ///		eventer.off(el, 'dragenter', this);
+			///}
+			his._dndDroppable.destroy();
 		}
 
 
