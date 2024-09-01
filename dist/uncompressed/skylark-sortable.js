@@ -5,10 +5,8 @@
  * @link https://github.com/skylark-integration/skylark-sortable/
  * @license MIT
  */
-(function(factory,globals) {
-  var define = globals.define,
-      require = globals.require,
-      isAmd = (typeof define === 'function' && define.amd),
+(function(factory,globals,define,require) {
+  var isAmd = (typeof define === 'function' && define.amd),
       isCmd = (!isAmd && typeof exports !== 'undefined');
 
   if (!isAmd && !define) {
@@ -530,13 +528,21 @@ define('skylark-domx-plugins-dnd/draggable',[
                 "mousedown": function(e) {
                     var options = self.options;
                     if (options.handle) {
-                        self.dragHandle = finder.closest(e.target, options.handle,self._elm);
+                        if (langx.isFunction(options.handle)) {
+                            self.dragHandle = options.handle(e.target,self._elm);
+                        } else {
+                            self.dragHandle = finder.closest(e.target, options.handle,self._elm);
+                        }
                         if (!self.dragHandle) {
                             return;
                         }
                     }
                     if (options.source) {
-                        self.dragSource = finder.closest(e.target, options.source,self._elm);
+                        if (langx.isFunction(options.source)) {
+                            self.dragSource =  options.source(e.target, self._elm);                            
+                        } else {
+                            self.dragSource = finder.closest(e.target, options.source,self._elm);                            
+                        }
                     } else {
                         self.dragSource = self._elm;
                     }
@@ -559,10 +565,16 @@ define('skylark-domx-plugins-dnd/draggable',[
                 },
 
                 "dragstart": function(e) {
+                    if (manager.dragging !== self) {
+                        return;
+                    }
                     manager.start(self, e);
                 },
 
                 "dragend": function(e) {
+                    if (manager.dragging !== self) {
+                        return;
+                    }
                     eventer.stop(e);
 
                     if (!manager.dragging) {
@@ -1082,7 +1094,8 @@ define('skylark-domx-plugins-dnd/droppable',[
             manager.on("dndStarted", function(e) {
                 var e2 = eventer.create("started", {
                     transfer: manager.draggingTransfer,
-                    acceptable: false
+                    acceptable: false,
+                    dragging : e.dragging 
                 });
 
                 self.trigger(e2);
@@ -2033,7 +2046,7 @@ define('skylark-sortable/Sortable',[
 
 			options = this.options;
 
-			options.draggable = options.draggable || /[uo]l/i.test(el.nodeName) ? '>li' : '>*';
+			options.draggable = options.draggable || (/[uo]l/i.test(el.nodeName) ? '>li' : '>*');
 
 
 			_prepareGroup(options);
@@ -2372,5 +2385,5 @@ define('skylark-sortable/main',[
 define('skylark-sortable', ['skylark-sortable/main'], function (main) { return main; });
 
 
-},this);
+},this,define,require);
 //# sourceMappingURL=sourcemaps/skylark-sortable.js.map

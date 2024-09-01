@@ -24,6 +24,11 @@ requirejs.config({
             main: 'main'
          },
          {
+           name : "skylark-langx-chars",
+           location : "../node_modules/skylark-langx-chars/dist/uncompressed/skylark-langx-chars",
+            main: 'main'
+         },
+         {
            name : "skylark-langx-constructs",
            location : "../node_modules/skylark-langx-constructs/dist/uncompressed/skylark-langx-constructs",
             main: 'main'
@@ -84,6 +89,11 @@ requirejs.config({
             main: 'main'
          },
          {
+           name : "skylark-langx-paths",
+           location : "../node_modules/skylark-langx-paths/dist/uncompressed/skylark-langx-paths",
+            main: 'main'
+         },
+         {
            name : "skylark-langx-strings",
            location : "../node_modules/skylark-langx-strings/dist/uncompressed/skylark-langx-strings",
             main: 'main'
@@ -96,6 +106,11 @@ requirejs.config({
          {
            name : "skylark-langx-types",
            location : "../node_modules/skylark-langx-types/dist/uncompressed/skylark-langx-types",
+            main: 'main'
+         },
+         {
+           name : "skylark-langx-urls",
+           location : "../node_modules/skylark-langx-urls/dist/uncompressed/skylark-langx-urls",
             main: 'main'
          },
          {
@@ -151,6 +166,11 @@ requirejs.config({
             main: 'main'
          },
          {
+           name : "skylark-domx-iframes",
+           location : "../node_modules/skylark-domx-iframes/dist/uncompressed/skylark-domx-iframes",
+            main: 'main'
+         },
+         {
            name : "skylark-domx-images",
            location : "../node_modules/skylark-domx-images/dist/uncompressed/skylark-domx-images",
             main: 'main'
@@ -158,6 +178,16 @@ requirejs.config({
          {
            name : "skylark-domx-layouts",
            location : "../node_modules/skylark-domx-layouts/dist/uncompressed/skylark-domx-layouts",
+            main: 'main'
+         },
+         {
+           name : "skylark-domx-lists",
+           location : "../node_modules/skylark-domx-lists/dist/uncompressed/skylark-domx-lists",
+            main: 'main'
+         },
+         {
+           name : "skylark-domx-medias",
+           location : "../node_modules/skylark-domx-medias/dist/uncompressed/skylark-domx-medias",
             main: 'main'
          },
          {

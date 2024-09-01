@@ -214,7 +214,7 @@ define([
 
 			options = this.options;
 
-			options.draggable = options.draggable || /[uo]l/i.test(el.nodeName) ? '>li' : '>*';
+			options.draggable = options.draggable || (/[uo]l/i.test(el.nodeName) ? '>li' : '>*');
 
 
 			_prepareGroup(options);
